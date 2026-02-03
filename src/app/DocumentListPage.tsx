@@ -8,12 +8,14 @@ import { UploadModal } from '../components/UploadModal'
 import { loadPdf, getPdfPage } from '../pdf/pdfLoader'
 import { exportPdfAsBlob } from '../export/exportHybridPdf'
 import type { DetectedSpan, TagEntry, PageModel } from '../types'
+import { ConfirmDialog } from '../components/ConfirmDialog'
 import {
   deleteDocumentMeta,
   deleteDocumentData,
   getDocumentData,
   loadAllDocumentMetas,
   renameDocumentMeta,
+  wipeAllLocalData,
 } from '../state/documentsPersistence'
 
 // Transform SavedDocument to Document interface for DocumentCard
@@ -41,6 +43,8 @@ export default function DocumentListPage() {
   const getSavedDocument = useStore((state) => state.getSavedDocument)
 
   const [isUploadModalOpen, setIsUploadModalOpen] = useState(false)
+  const [showLogoutConfirm, setShowLogoutConfirm] = useState(false)
+  const [isLoggingOut, setIsLoggingOut] = useState(false)
 
   // Model loading hook (preload models while on documents page)
   const { modelsReady, modelLoadingProgress } = useModelLoader()
@@ -65,10 +69,24 @@ export default function DocumentListPage() {
     }
   }, [setSavedDocuments])
 
-  const handleLogout = () => {
-    logout()
-    navigate('/login')
+  const handleLogoutClick = () => {
+    setShowLogoutConfirm(true)
   }
+
+  const handleConfirmLogout = useCallback(async () => {
+    setIsLoggingOut(true)
+    try {
+      await wipeAllLocalData()
+    } catch (e) {
+      console.error('[Documents] Failed to wipe local data on logout:', e)
+      // Continue logout anyway
+    } finally {
+      logout()
+      navigate('/login')
+      setIsLoggingOut(false)
+      setShowLogoutConfirm(false)
+    }
+  }, [logout, navigate])
 
   const handleNewDocument = () => {
     setIsUploadModalOpen(true)
@@ -251,7 +269,7 @@ export default function DocumentListPage() {
 
               {/* Logout */}
               <button
-                onClick={handleLogout}
+                onClick={handleLogoutClick}
                 className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-slate-500 hover:text-slate-700 hover:bg-slate-100 transition-colors"
               >
                 <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -328,6 +346,25 @@ export default function DocumentListPage() {
         modelsReady={modelsReady}
         modelLoadingProgress={modelLoadingProgress}
       />
+
+      {/* Logout confirmation */}
+      {showLogoutConfirm && (
+        <ConfirmDialog
+          title={t('logoutConfirm.title')}
+          message={t('logoutConfirm.message')}
+          confirmText={isLoggingOut ? t('logoutConfirm.working') : t('logoutConfirm.confirm')}
+          cancelText={t('logoutConfirm.cancel')}
+          confirmVariant="danger"
+          onConfirm={() => {
+            if (isLoggingOut) return
+            void handleConfirmLogout()
+          }}
+          onCancel={() => {
+            if (isLoggingOut) return
+            setShowLogoutConfirm(false)
+          }}
+        />
+      )}
     </div>
   )
 }

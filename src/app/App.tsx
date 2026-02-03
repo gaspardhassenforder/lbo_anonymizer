@@ -24,6 +24,7 @@ import { ProcessingOverlay } from '../components/ProcessingOverlay'
 import { PaginatedPdfViewer } from '../components/PaginatedPdfViewer'
 import { Sidebar } from '../components/Sidebar'
 import { Toolbar } from '../components/Toolbar'
+import { EditorHelpDialog } from '../components/EditorHelpDialog'
 
 export default function App() {
   const { t, i18n } = useTranslation()
@@ -34,9 +35,11 @@ export default function App() {
   const [restoringPdf, setRestoringPdf] = useState(false)
   const [loadingDocument, setLoadingDocument] = useState(false)
   const [processingFromLocationState, setProcessingFromLocationState] = useState(false)
+  const [showEditorHelp, setShowEditorHelp] = useState(false)
   const hasTriedRestore = useRef(false)
   const hasTriedLoadDocument = useRef(false)
   const hasProcessedLocationState = useRef(false)
+  const hasShownHelpThisSession = useRef(false)
 
   // Model loading hook (loads OCR + NER on app mount)
   // Note: modelsReady and modelLoadingProgress are used in the upload modal on DocumentListPage
@@ -120,6 +123,20 @@ export default function App() {
       cancelled = true
     }
   }, [setSavedDocuments, setCorpusRules])
+
+  // Show editor help popup when entering editor with a loaded document
+  useEffect(() => {
+    if (hasShownHelpThisSession.current) return
+    if (!pdfDocument) return
+    if (pages.length === 0) return
+    if (processing.stage !== 'ready') return
+
+    const dismissed = localStorage.getItem('lbo-anonymizer-editor-help-dismissed') === '1'
+    if (!dismissed) {
+      setShowEditorHelp(true)
+    }
+    hasShownHelpThisSession.current = true
+  }, [pdfDocument, pages.length, processing.stage])
 
   // Warn user before closing/refreshing when document is loaded
   useEffect(() => {
@@ -963,6 +980,15 @@ export default function App() {
   // Show main editor
   return (
     <div className="h-screen flex flex-col bg-slate-100">
+      <EditorHelpDialog
+        isOpen={showEditorHelp}
+        onClose={(dontShowAgain) => {
+          if (dontShowAgain) {
+            localStorage.setItem('lbo-anonymizer-editor-help-dismissed', '1')
+          }
+          setShowEditorHelp(false)
+        }}
+      />
       {/* Toolbar */}
       <Toolbar
         filename={((loadedDocumentId ? getSavedDocument(loadedDocumentId)?.filename : null) ?? file?.name) ?? null}

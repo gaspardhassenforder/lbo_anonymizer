@@ -168,6 +168,28 @@
   "editor": {
     "unsavedChangesWarning": "You have unsaved changes. Are you sure you want to leave?"
   },
+  "editorHelp": {
+    "title": "How the editor works",
+    "subtitle": "Manual anonymization and scope options",
+    "selectingTitle": "Selecting text (two-click range)",
+    "selectingStep1": "Click a word to set the start of the selection.",
+    "selectingStep2": "Move the mouse to preview the range.",
+    "selectingStep3": "Click another word to finish. Press Esc or click outside to cancel.",
+    "anonymizeTitle": "Anonymize (add an annotation)",
+    "anonymizeStep1": "After selecting, choose the entity type to anonymize.",
+    "deanonymizeTitle": "De‑anonymize (remove an annotation)",
+    "deanonymizeStep1": "Click a highlighted redaction to open actions, then choose Remove.",
+    "scopeStep": "When asked, you can apply the change to this instance, the whole document, or the whole corpus.",
+    "dontShowAgain": "Don't show this again",
+    "gotIt": "Got it"
+  },
+  "logoutConfirm": {
+    "title": "Log out and delete local data?",
+    "message": "Logging out will delete all locally saved documents and rules from this browser (IndexedDB) and clear your current session. This cannot be undone.\n\nDo you want to continue?",
+    "confirm": "Log out and delete",
+    "cancel": "Cancel",
+    "working": "Deleting..."
+  },
   "viewer": {
     "pagePending": "Pending...",
     "pageProcessing": "Processing...",

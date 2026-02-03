@@ -91,6 +91,27 @@ export async function saveCorpusRules(rules: CorpusRules): Promise<void> {
 }
 
 /**
+ * Wipe all locally persisted documents + rules from IndexedDB.
+ */
+export async function wipeAllLocalData(): Promise<void> {
+  // Delete document meta list + corpus rules first
+  await del(DOC_META_KEY)
+  await del(CORPUS_RULES_KEY)
+
+  // Delete all per-document data keys
+  const allKeys = await keys()
+  const toDelete = allKeys
+    .filter((k) => typeof k === 'string' && (k as string).startsWith(DOC_DATA_PREFIX))
+    .map((k) => k as string)
+  for (const k of toDelete) {
+    await del(k)
+  }
+
+  // Also clear any legacy single-PDF persistence
+  await cleanupLegacyPersistence()
+}
+
+/**
  * Best-effort wipe for previous single-PDF persistence keys and any lingering doc-data keys.
  * Intended for migrations/dev cleanup; safe to call.
  */
