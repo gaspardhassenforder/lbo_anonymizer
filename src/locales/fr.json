@@ -1,0 +1,181 @@
+{
+  "app": {
+    "title": "LBO Anonymizer",
+    "subtitle": "Protégez les données sensibles de vos documents confidentiels"
+  },
+  "login": {
+    "title": "Connexion",
+    "subtitle": "Connectez-vous pour accéder a vos documents",
+    "username": "Nom d'utilisateur",
+    "usernamePlaceholder": "Entrez votre nom d'utilisateur",
+    "password": "Mot de passe",
+    "passwordPlaceholder": "Entrez votre mot de passe",
+    "submit": "Se connecter",
+    "loggingIn": "Connexion en cours...",
+    "error": "Nom d'utilisateur ou mot de passe invalide",
+    "demoHint": "Identifiants demo : admin / admin"
+  },
+  "landing": {
+    "badge": "Vos fichiers restent sur votre ordinateur",
+    "description": "Détectez et masquez automatiquement les informations sensibles dans vos documents PDF",
+    "footer": "Détection automatique propulsée par l'intelligence artificielle"
+  },
+  "dropzone": {
+    "title": "Déposez votre PDF ici",
+    "titleDragOver": "Relâchez pour charger",
+    "browse": "ou cliquez pour parcourir",
+    "privacyBadge": "Vos données ne quittent jamais votre navigateur",
+    "loadingModels": "Chargement des modèles IA...",
+    "modelsReady": "Modèles prêts"
+  },
+  "toolbar": {
+    "pdf": "PDF",
+    "pages": "{{count}} page",
+    "pages_plural": "{{count}} pages",
+    "undo": "Annuler",
+    "redo": "Retablir",
+    "zoomOut": "Dezoomer",
+    "zoomIn": "Zoomer",
+    "resetZoom": "Reinitialiser le zoom",
+    "exportJson": "Exporter JSON",
+    "exportPdf": "Exporter PDF",
+    "newFile": "Nouveau fichier",
+    "confirmAnonymisation": "Confirmer"
+  },
+  "documents": {
+    "title": "Vos Documents",
+    "subtitle": "Consultez et gerez vos documents anonymises",
+    "loadNew": "Charger un Nouveau Document",
+    "logout": "Deconnexion",
+    "loading": "Chargement des documents...",
+    "loadError": "Echec du chargement des documents",
+    "retry": "Reessayer",
+    "empty": "Aucun document",
+    "emptyHint": "Telechargez et anonymisez votre premier document pour le voir ici",
+    "pages": "{{count}} page",
+    "pages_plural": "{{count}} pages",
+    "entities": "{{count}} entité",
+    "entities_plural": "{{count}} entités",
+    "view": "Voir",
+    "download": "Telecharger",
+    "delete": "Supprimer",
+    "rename": "Renommer",
+    "confirmDelete": "Etes-vous sur de vouloir supprimer ce document ?",
+    "viewNotImplemented": "La visualisation des documents n'est pas encore implementee",
+    "downloadError": "Echec du telechargement du document",
+    "generating": "Génération...",
+    "deleteError": "Echec de la suppression du document",
+    "renameError": "Echec du renommage du document"
+  },
+  "sidebar": {
+    "title": "Entités détectées",
+    "subtitle": "Cliquez pour sélectionner, survolez pour apercevoir",
+    "confidence": "Niveau de certitude",
+    "confidenceAll": "Toutes",
+    "confidenceHigh": "Haute certitude",
+    "noEntities": "Aucune entité détectée",
+    "noEntitiesHint": "Essayez de baisser le niveau de certitude",
+    "tagMapping": "Correspondance des tags",
+    "moreItems": "+{{count}} de plus..."
+  },
+  "processing": {
+    "loadingPdf": "Chargement du document",
+    "loadingPdfMessage": "Ouverture du PDF...",
+    "extractingText": "Extraction du texte",
+    "extractingTextMessage": "Lecture du contenu du document...",
+    "runningOcr": "Lecture du document",
+    "runningOcrMessage": "Analyse de la page {{page}}...",
+    "loadingModel": "Préparation de l'analyse",
+    "loadingModelMessage": "Chargement du moteur de détection...",
+    "detectingEntities": "Identification des données sensibles",
+    "detectingEntitiesMessage": "Recherche des informations personnelles...",
+    "generatingPdf": "Creation du PDF",
+    "generatingPdfMessage": "Generation du document anonymise...",
+    "uploadingDocument": "Telechargement du document...",
+    "processingLocally": "Vos donnees sont traitees localement",
+    "processing": "Traitement en cours..."
+  },
+  "dialogs": {
+    "removeAnnotation": "Supprimer l'annotation",
+    "removeAllInstances": "{{count}} occurrences de \"{{text}}\" trouvées.\n\nVoulez-vous toutes les supprimer ?",
+    "removeAll": "Tout supprimer",
+    "removeThisOne": "Supprimer celle-ci",
+    "applyToAll": "Appliquer à toutes les occurrences",
+    "foundOccurrences": "{{count}} occurrences de \"{{text}}\" trouvées dans le document.",
+    "annotateAllAs": "Voulez-vous toutes les annoter comme {{label}} ?",
+    "annotateAll": "Tout annoter",
+    "annotateThisOne": "Annoter celle-ci",
+    "confirm": "Confirmer",
+    "cancel": "Annuler",
+    "changeLabelTitle": "Changer le type",
+    "changeLabelMessage": "{{count}} occurrences de \"{{text}}\" trouvées.\n\nTout changer en {{label}} ?",
+    "changeAll": "Tout changer",
+    "changeThisOne": "Changer celle-ci"
+  },
+  "popover": {
+    "changeLabel": "Changer le type",
+    "remove": "Supprimer",
+    "back": "Retour",
+    "selectEntityType": "Sélectionner le type d'entité",
+    "matchesFound": "{{count}} correspondances trouvées dans le document",
+    "confidence": "{{value}}% de certitude"
+  },
+  "source": {
+    "ner": "IA",
+    "regex": "Automatique",
+    "user": "Manuel"
+  },
+  "entities": {
+    "PERSON": "Personne",
+    "ORGANIZATION": "Organisation",
+    "ADDRESS": "Adresse",
+    "EMAIL": "Email",
+    "PHONE": "Téléphone",
+    "SSN": "N° Sécurité Sociale",
+    "IBAN": "IBAN",
+    "BANK_ACCOUNT": "Compte Bancaire",
+    "CREDIT_CARD": "Carte de Crédit",
+    "DATE": "Date",
+    "SIREN": "SIREN",
+    "SIRET": "SIRET",
+    "CAPITAL": "Capital"
+  },
+  "privacy": {
+    "title": "Vos données sont protégées",
+    "description": "Aucune donnée n'est envoyée sur internet. Tout le traitement se fait directement sur votre ordinateur.",
+    "localProcessing": "Traitement 100% local",
+    "noUpload": "Fichiers jamais téléversés",
+    "instant": "Analyse instantanée"
+  },
+  "scope": {
+    "thisInstance": "Cette instance uniquement",
+    "thisInstanceDesc": "Modifier uniquement cette occurrence",
+    "wholeDocument": "Dans tout le document",
+    "wholeDocumentDesc": "Modifier les {{count}} occurrences dans ce document",
+    "allDocuments": "Dans tous vos documents",
+    "allDocumentsDesc": "Modifier dans tous vos documents actuels et futurs",
+    "futureDocuments": "Appliquer aux futurs documents",
+    "futureDocumentsDesc": "Ce changement s'appliquera à tous les documents que vous traiterez à l'avenir",
+    "selectScope": "Choisir la portée",
+    "addTitle": "Ajouter une annotation",
+    "removeTitle": "Supprimer l'annotation",
+    "changeLabelTitle": "Changer le type"
+  },
+  "common": {
+    "page": "p.",
+    "noFile": "Aucun fichier"
+  },
+  "editor": {
+    "unsavedChangesWarning": "Vous avez des modifications non enregistrées. Êtes-vous sûr de vouloir quitter ?"
+  },
+  "viewer": {
+    "pagePending": "En attente...",
+    "pageProcessing": "Traitement en cours...",
+    "pageError": "Échec du traitement",
+    "previousPage": "Page précédente",
+    "nextPage": "Page suivante",
+    "pageOf": "Page {{current}} / {{total}}",
+    "pagesProcessed": "{{count}}/{{total}} traitées",
+    "allProcessed": "Tout traité"
+  }
+}

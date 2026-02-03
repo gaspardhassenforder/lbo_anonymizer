@@ -1,0 +1,658 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NER Pipeline Test - CamemBERT</title>
+    <style>
+        * {
+            box-sizing: border-box;
+        }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        h1, h2, h3 {
+            color: #333;
+        }
+        .card {
+            background: white;
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .status {
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            font-weight: 500;
+        }
+        .status.loading {
+            background: #fff3cd;
+            color: #856404;
+        }
+        .status.ready {
+            background: #d4edda;
+            color: #155724;
+        }
+        .status.error {
+            background: #f8d7da;
+            color: #721c24;
+        }
+        button {
+            background: #007bff;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 16px;
+            margin-right: 10px;
+            margin-bottom: 10px;
+        }
+        button:hover {
+            background: #0056b3;
+        }
+        button:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 10px;
+            font-size: 14px;
+        }
+        th, td {
+            border: 1px solid #ddd;
+            padding: 10px;
+            text-align: left;
+        }
+        th {
+            background: #f8f9fa;
+            font-weight: 600;
+        }
+        .entity-NOM { background: #e3f2fd; }
+        .entity-ENTREPRISE { background: #fff3e0; }
+        .entity-LIEU { background: #e8f5e9; }
+        .entity-AUTRE { background: #f3e5f5; }
+        .score-high { color: #2e7d32; font-weight: 600; }
+        .score-medium { color: #f57c00; }
+        .score-low { color: #c62828; }
+        .sentence-box {
+            background: #f8f9fa;
+            padding: 12px;
+            border-radius: 6px;
+            margin-bottom: 15px;
+            border-left: 4px solid #007bff;
+        }
+        .results-container {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
+            gap: 20px;
+        }
+        .strategy-card {
+            background: #fafafa;
+            border: 1px solid #e0e0e0;
+            border-radius: 8px;
+            padding: 15px;
+        }
+        .strategy-card h4 {
+            margin-top: 0;
+            color: #1976d2;
+        }
+        .strategy-card.custom h4 {
+            color: #f59e0b;
+        }
+        pre {
+            background: #263238;
+            color: #aed581;
+            padding: 15px;
+            border-radius: 6px;
+            overflow-x: auto;
+            font-size: 13px;
+            max-height: 500px;
+            overflow-y: auto;
+        }
+        .download-btn {
+            background: #28a745;
+        }
+        .download-btn:hover {
+            background: #218838;
+        }
+        .progress-bar {
+            width: 100%;
+            height: 20px;
+            background: #e0e0e0;
+            border-radius: 10px;
+            overflow: hidden;
+            margin-top: 10px;
+        }
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #4caf50, #8bc34a);
+            transition: width 0.3s;
+        }
+        .summary-table {
+            margin-bottom: 30px;
+        }
+        .comparison-diff {
+            background: #fff8e1;
+            padding: 10px;
+            border-radius: 6px;
+            margin: 10px 0;
+        }
+        .custom-badge {
+            background: #f59e0b;
+            color: #000;
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-size: 12px;
+            font-weight: 600;
+            margin-left: 8px;
+        }
+    </style>
+</head>
+<body>
+    <h1>🔬 NER Pipeline Test - CamemBERT-NER</h1>
+
+    <div class="card">
+        <h2>Configuration</h2>
+        <p><strong>Model:</strong> Xenova/camembert-ner (via ml-anonymizer.js)</p>
+        <p><strong>Strategies tested:</strong> none, simple, first, average, max + <span class="custom-badge">Custom Aggregation</span></p>
+        <p><em>NER only - no regex patterns</em></p>
+
+        <div id="status" class="status loading">
+            Waiting to start...
+        </div>
+        <div class="progress-bar" id="progressBar" style="display: none;">
+            <div class="progress-fill" id="progressFill" style="width: 0%"></div>
+        </div>
+
+        <br>
+        <button id="runBtn" onclick="runTests()">▶️ Run Tests</button>
+        <button id="diagnoseBtn" onclick="runDiagnostic()" style="background: #9c27b0;">🔬 Diagnose</button>
+        <button id="downloadMdBtn" class="download-btn" onclick="downloadMarkdown()" disabled>📄 Download Markdown</button>
+        <button id="downloadJsonBtn" class="download-btn" onclick="downloadJSON()" disabled>📊 Download JSON</button>
+    </div>
+
+    <div id="diagnostic" class="card" style="display: none;">
+        <h2>🔬 Diagnostic Results</h2>
+        <pre id="diagnosticOutput" style="white-space: pre-wrap;"></pre>
+    </div>
+
+    <div id="summary" class="card" style="display: none;">
+        <h2>📊 Summary</h2>
+        <div id="summaryContent"></div>
+    </div>
+
+    <div id="results" class="card" style="display: none;">
+        <h2>📝 Detailed Results</h2>
+        <div id="resultsContent"></div>
+    </div>
+
+    <div id="comparison" class="card" style="display: none;">
+        <h2>🔍 Comparison: Built-in vs Custom Aggregation</h2>
+        <div id="comparisonContent"></div>
+    </div>
+
+    <div id="rawOutput" class="card" style="display: none;">
+        <h2>📋 Raw Markdown Output</h2>
+        <pre id="markdownPre"></pre>
+    </div>
+
+    <script type="module">
+        // Import functions from ml-anonymizer.js
+        import {
+            loadModel,
+            getPipeline,
+            setStatusCallback,
+            aggregateNERTokens,
+            filterFalsePositives,
+            NER_TO_ENTITY_TYPE,
+            diagnoseAggregation
+        } from './js/ml-anonymizer.js';
+
+        // Test sentences
+        const TEST_SENTENCES = [
+            "Jean-Pierre DUPONT est le directeur général.",
+            "Marc LEBLANC représente le management.",
+            "Sophie MARTIN est directrice financière.",
+            "Thomas BERNARD travaille comme directeur commercial.",
+            "Monsieur Jacques Chirac a été président de la République.",
+            "Madame Marie-Claire Duval est avocate au barreau de Paris.",
+            "TECHNOFRANCE SAS est immatriculée au RCS de Paris.",
+            "Le Fonds Europe Capital III SCR représente l'investisseur.",
+            "BNP Paribas finance l'opération.",
+            "Société Générale est partenaire bancaire.",
+            "Le groupe Carrefour a signé le contrat.",
+            "Le siège social est situé à Paris.",
+            "L'usine est installée à Lyon.",
+            "Les bureaux sont au 45 Avenue des Champs-Élysées.",
+            "La filiale se trouve en Belgique.",
+            "Le contrat a été signé à Bruxelles.",
+            "Jean-Pierre DUPONT, représentant du Fonds Europe Capital III SCR, a signé le contrat avec Marc LEBLANC de TECHNOFRANCE SAS à Paris le 15 janvier 2024.",
+            "Sophie MARTIN et Thomas BERNARD sont domiciliés respectivement au 23 Rue de Rivoli à Paris et au 156 Avenue Victor Hugo.",
+            "La société BNP Paribas, en accord avec Société Générale, finance l'acquisition de TECHNOFRANCE SAS par le fonds d'investissement basé à Luxembourg."
+        ];
+
+        let testResults = null;
+        let markdownOutput = '';
+
+        function updateStatus(message, type = 'loading') {
+            const status = document.getElementById('status');
+            status.textContent = message;
+            status.className = `status ${type}`;
+        }
+
+        function updateProgress(pct) {
+            const bar = document.getElementById('progressBar');
+            const fill = document.getElementById('progressFill');
+            bar.style.display = 'block';
+            fill.style.width = `${pct}%`;
+        }
+
+        function getScoreClass(score) {
+            if (score >= 0.7) return 'score-high';
+            if (score >= 0.5) return 'score-medium';
+            return 'score-low';
+        }
+
+        // Set up status callback
+        setStatusCallback((message, progress) => {
+            if (progress !== null) {
+                updateStatus(`${message} (${Math.round(progress * 100)}%)`);
+                updateProgress(progress * 50);
+            } else {
+                updateStatus(message);
+            }
+        });
+
+        async function runTests() {
+            const runBtn = document.getElementById('runBtn');
+            runBtn.disabled = true;
+
+            try {
+                updateStatus('Loading model...', 'loading');
+                await loadModel();
+                const pipeline = getPipeline();
+
+                if (!pipeline) {
+                    throw new Error('Failed to load pipeline');
+                }
+
+                const results = {
+                    timestamp: new Date().toISOString(),
+                    model: 'Xenova/camembert-ner',
+                    strategies: {}
+                };
+
+                // Built-in strategies + custom
+                const strategies = ['none', 'simple', 'first', 'average', 'max', 'custom'];
+                const totalTests = strategies.length * TEST_SENTENCES.length;
+                let completed = 0;
+
+                for (const strategy of strategies) {
+                    updateStatus(`Testing strategy: ${strategy}...`, 'loading');
+                    results.strategies[strategy] = [];
+
+                    for (const sentence of TEST_SENTENCES) {
+                        try {
+                            let entities = [];
+
+                            if (strategy === 'custom') {
+                                // Use our custom aggregation from ml-anonymizer.js
+                                const rawResults = await pipeline(sentence, {
+                                    aggregation_strategy: 'none'
+                                });
+
+                                const aggregated = aggregateNERTokens(rawResults, sentence);
+                                const filtered = filterFalsePositives(aggregated, sentence);
+
+                                entities = filtered.map(r => {
+                                    const text = sentence.slice(r.start, r.end);
+                                    return {
+                                        text: text || r.word || '(unknown)',
+                                        word: r.word,
+                                        entity: r.entity_group,
+                                        mapped_type: NER_TO_ENTITY_TYPE[r.entity_group] || 'AUTRE',
+                                        score: parseFloat(r.score.toFixed(4)),
+                                        start: r.start,
+                                        end: r.end,
+                                        tokenCount: r.tokenCount
+                                    };
+                                });
+                            } else {
+                                // Use built-in aggregation strategy
+                                const nerResults = await pipeline(sentence, {
+                                    aggregation_strategy: strategy
+                                });
+
+                                entities = nerResults.map(r => {
+                                    let text = '';
+                                    if (r.start !== undefined && r.end !== undefined) {
+                                        text = sentence.slice(r.start, r.end);
+                                    }
+                                    if (!text && r.word) {
+                                        text = r.word.replace(/^##/, '').replace(/^▁/, '');
+                                    }
+                                    return {
+                                        text: text || r.word || '(unknown)',
+                                        word: r.word,
+                                        entity: r.entity_group || r.entity,
+                                        mapped_type: NER_TO_ENTITY_TYPE[r.entity_group] || NER_TO_ENTITY_TYPE[r.entity] || 'AUTRE',
+                                        score: parseFloat(r.score.toFixed(4)),
+                                        start: r.start,
+                                        end: r.end
+                                    };
+                                });
+                            }
+
+                            results.strategies[strategy].push({
+                                sentence,
+                                entities
+                            });
+                        } catch (error) {
+                            results.strategies[strategy].push({
+                                sentence,
+                                error: error.message
+                            });
+                        }
+
+                        completed++;
+                        updateProgress(50 + (completed / totalTests) * 50);
+                    }
+                }
+
+                testResults = results;
+                markdownOutput = generateMarkdown(results);
+
+                displaySummary(results);
+                displayResults(results);
+                displayComparison(results);
+                displayMarkdown(markdownOutput);
+
+                document.getElementById('downloadMdBtn').disabled = false;
+                document.getElementById('downloadJsonBtn').disabled = false;
+
+                updateStatus('Tests completed!', 'ready');
+
+            } catch (error) {
+                updateStatus(`Error: ${error.message}`, 'error');
+                console.error(error);
+            } finally {
+                runBtn.disabled = false;
+            }
+        }
+
+        function displaySummary(results) {
+            const container = document.getElementById('summary');
+            const content = document.getElementById('summaryContent');
+            container.style.display = 'block';
+
+            let html = '<table class="summary-table"><thead><tr>';
+            html += '<th>Strategy</th><th>Total Entities</th><th>Avg Score</th><th>NOM</th><th>ENTREPRISE</th><th>LIEU</th><th>AUTRE</th>';
+            html += '</tr></thead><tbody>';
+
+            for (const [strategy, sentences] of Object.entries(results.strategies)) {
+                let total = 0;
+                let scoreSum = 0;
+                const typeCounts = { NOM: 0, ENTREPRISE: 0, LIEU: 0, AUTRE: 0 };
+
+                for (const s of sentences) {
+                    if (s.entities) {
+                        for (const e of s.entities) {
+                            total++;
+                            scoreSum += e.score;
+                            typeCounts[e.mapped_type] = (typeCounts[e.mapped_type] || 0) + 1;
+                        }
+                    }
+                }
+
+                const avgScore = total > 0 ? (scoreSum / total).toFixed(3) : 'N/A';
+                const isCustom = strategy === 'custom';
+                html += `<tr${isCustom ? ' style="background: #fff8e1; font-weight: 600;"' : ''}>
+                    <td><strong>${strategy}</strong>${isCustom ? ' <span class="custom-badge">Recommended</span>' : ''}</td>
+                    <td>${total}</td>
+                    <td class="${getScoreClass(parseFloat(avgScore))}">${avgScore}</td>
+                    <td>${typeCounts.NOM}</td>
+                    <td>${typeCounts.ENTREPRISE}</td>
+                    <td>${typeCounts.LIEU}</td>
+                    <td>${typeCounts.AUTRE}</td>
+                </tr>`;
+            }
+
+            html += '</tbody></table>';
+            content.innerHTML = html;
+        }
+
+        function displayResults(results) {
+            const container = document.getElementById('results');
+            const content = document.getElementById('resultsContent');
+            container.style.display = 'block';
+
+            let html = '<div class="results-container">';
+
+            for (const [strategy, sentences] of Object.entries(results.strategies)) {
+                const isCustom = strategy === 'custom';
+                html += `<div class="strategy-card${isCustom ? ' custom' : ''}">
+                    <h4>Strategy: ${strategy}${isCustom ? ' <span class="custom-badge">Custom</span>' : ''}</h4>`;
+
+                for (let i = 0; i < Math.min(sentences.length, 5); i++) { // Show first 5 for brevity
+                    const s = sentences[i];
+                    html += `<div class="sentence-box">${s.sentence}</div>`;
+
+                    if (s.error) {
+                        html += `<p style="color: red;">Error: ${s.error}</p>`;
+                    } else if (s.entities.length === 0) {
+                        html += `<p><em>No entities detected</em></p>`;
+                    } else {
+                        html += '<table><thead><tr><th>Text</th><th>Type</th><th>Score</th>';
+                        if (isCustom) html += '<th>Tokens</th>';
+                        html += '</tr></thead><tbody>';
+                        for (const e of s.entities) {
+                            html += `<tr class="entity-${e.mapped_type}">
+                                <td>${e.text}</td>
+                                <td>${e.mapped_type}</td>
+                                <td class="${getScoreClass(e.score)}">${e.score.toFixed(4)}</td>
+                                ${isCustom ? `<td>${e.tokenCount || '-'}</td>` : ''}
+                            </tr>`;
+                        }
+                        html += '</tbody></table>';
+                    }
+                }
+
+                if (sentences.length > 5) {
+                    html += `<p><em>... and ${sentences.length - 5} more sentences</em></p>`;
+                }
+
+                html += '</div>';
+            }
+
+            html += '</div>';
+            content.innerHTML = html;
+        }
+
+        function displayComparison(results) {
+            const container = document.getElementById('comparison');
+            const content = document.getElementById('comparisonContent');
+            container.style.display = 'block';
+
+            const simpleResults = results.strategies['simple'] || [];
+            const customResults = results.strategies['custom'] || [];
+            let html = '';
+            let diffCount = 0;
+
+            for (let i = 0; i < TEST_SENTENCES.length; i++) {
+                const simple = simpleResults[i]?.entities || [];
+                const custom = customResults[i]?.entities || [];
+
+                const simpleTexts = simple.map(e => e.text).sort().join(', ');
+                const customTexts = custom.map(e => e.text).sort().join(', ');
+
+                if (simpleTexts !== customTexts) {
+                    diffCount++;
+                    html += `<div class="comparison-diff">
+                        <div class="sentence-box">${TEST_SENTENCES[i]}</div>
+                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
+                            <div>
+                                <strong>Simple (built-in):</strong>
+                                <ul>${simple.length === 0 ? '<li><em>None</em></li>' :
+                                    simple.map(e => `<li>"${e.text}" (${e.mapped_type}, <span class="${getScoreClass(e.score)}">${e.score.toFixed(3)}</span>)</li>`).join('')}</ul>
+                            </div>
+                            <div>
+                                <strong>Custom (ml-anonymizer.js):</strong>
+                                <ul>${custom.length === 0 ? '<li><em>None</em></li>' :
+                                    custom.map(e => `<li>"${e.text}" (${e.mapped_type}, <span class="${getScoreClass(e.score)}">${e.score.toFixed(3)}</span>${e.tokenCount ? `, ${e.tokenCount} tokens` : ''})</li>`).join('')}</ul>
+                            </div>
+                        </div>
+                    </div>`;
+                }
+            }
+
+            if (diffCount === 0) {
+                html = '<p>No differences found between simple and custom strategies.</p>';
+            } else {
+                html = `<p><strong>${diffCount} sentences</strong> have different results. Custom aggregation merges tokens better and filters false positives:</p>` + html;
+            }
+
+            content.innerHTML = html;
+        }
+
+        function displayMarkdown(md) {
+            const container = document.getElementById('rawOutput');
+            const pre = document.getElementById('markdownPre');
+            container.style.display = 'block';
+            pre.textContent = md;
+        }
+
+        function generateMarkdown(results) {
+            let md = `# NER Pipeline Test Results\n\n`;
+            md += `**Model:** ${results.model}\n`;
+            md += `**Date:** ${results.timestamp}\n`;
+            md += `**Note:** NER only (no regex patterns)\n\n`;
+            md += `---\n\n`;
+
+            // Summary table
+            md += `## Summary by Aggregation Strategy\n\n`;
+            md += `| Strategy | Total Entities | Avg Score | NOM | ENTREPRISE | LIEU | AUTRE |\n`;
+            md += `|----------|----------------|-----------|-----|------------|------|-------|\n`;
+
+            for (const [strategy, sentences] of Object.entries(results.strategies)) {
+                let total = 0;
+                let scoreSum = 0;
+                const typeCounts = { NOM: 0, ENTREPRISE: 0, LIEU: 0, AUTRE: 0 };
+
+                for (const s of sentences) {
+                    if (s.entities) {
+                        for (const e of s.entities) {
+                            total++;
+                            scoreSum += e.score;
+                            typeCounts[e.mapped_type] = (typeCounts[e.mapped_type] || 0) + 1;
+                        }
+                    }
+                }
+
+                const avgScore = total > 0 ? (scoreSum / total).toFixed(3) : 'N/A';
+                const marker = strategy === 'custom' ? ' ⭐' : '';
+                md += `| ${strategy}${marker} | ${total} | ${avgScore} | ${typeCounts.NOM} | ${typeCounts.ENTREPRISE} | ${typeCounts.LIEU} | ${typeCounts.AUTRE} |\n`;
+            }
+
+            md += `\n---\n\n`;
+
+            // Detailed results for custom strategy
+            md += `## Custom Aggregation Results\n\n`;
+            const customResults = results.strategies['custom'] || [];
+
+            for (const s of customResults) {
+                md += `### Sentence\n`;
+                md += `> ${s.sentence}\n\n`;
+
+                if (s.error) {
+                    md += `**Error:** ${s.error}\n\n`;
+                } else if (s.entities.length === 0) {
+                    md += `*No entities detected*\n\n`;
+                } else {
+                    md += `| Text | Type | Score | Tokens |\n`;
+                    md += `|------|------|-------|--------|\n`;
+                    for (const e of s.entities) {
+                        md += `| ${e.text} | ${e.mapped_type} | ${e.score.toFixed(4)} | ${e.tokenCount || '-'} |\n`;
+                    }
+                    md += `\n`;
+                }
+            }
+
+            return md;
+        }
+
+        window.runTests = runTests;
+
+        async function runDiagnostic() {
+            const diagnoseBtn = document.getElementById('diagnoseBtn');
+            diagnoseBtn.disabled = true;
+
+            try {
+                updateStatus('Loading model for diagnostic...', 'loading');
+                await loadModel();
+
+                updateStatus('Running diagnostic...', 'loading');
+                const testSentence = TEST_SENTENCES[0]; // "Jean-Pierre DUPONT est le directeur général."
+                const results = await diagnoseAggregation(testSentence);
+
+                const diagnosticDiv = document.getElementById('diagnostic');
+                const outputPre = document.getElementById('diagnosticOutput');
+                diagnosticDiv.style.display = 'block';
+
+                outputPre.textContent = JSON.stringify(results, null, 2);
+
+                // Add human-readable summary
+                let summary = '\n\n=== SUMMARY ===\n';
+                summary += `Total tokens: ${results.analysis?.totalTokens || 'N/A'}\n`;
+                summary += `Entity tokens (not O): ${results.analysis?.entityTokens || 'N/A'}\n`;
+                summary += `Has positions: ${results.analysis?.hasPositions || 'N/A'}\n`;
+                summary += `Positions match text: ${results.analysis?.positionsMatch || 'N/A'}\n`;
+                summary += `Simple entities found: ${results.analysis?.simpleCount || 0}\n`;
+                summary += `Custom entities found: ${results.analysis?.customCount || 0}\n`;
+                if (results.analysis?.likelyIssue) {
+                    summary += `\n⚠️ LIKELY ISSUE: ${results.analysis.likelyIssue}\n`;
+                    summary += `💡 SUGGESTION: ${results.analysis.suggestion}\n`;
+                }
+                outputPre.textContent += summary;
+
+                updateStatus('Diagnostic complete!', 'ready');
+
+            } catch (error) {
+                updateStatus(`Diagnostic error: ${error.message}`, 'error');
+                console.error(error);
+            } finally {
+                diagnoseBtn.disabled = false;
+            }
+        }
+        window.runDiagnostic = runDiagnostic;
+
+        window.downloadMarkdown = function() {
+            const blob = new Blob([markdownOutput], { type: 'text/markdown' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'ner-test-results.md';
+            a.click();
+            URL.revokeObjectURL(url);
+        };
+
+        window.downloadJSON = function() {
+            const blob = new Blob([JSON.stringify(testResults, null, 2)], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'ner-test-results.json';
+            a.click();
+            URL.revokeObjectURL(url);
+        };
+    </script>
+</body>
+</html>

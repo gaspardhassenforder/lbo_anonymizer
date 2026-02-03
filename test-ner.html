@@ -1,0 +1,528 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test NER - Debug</title>
+    <style>
+        * { box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background: #1a1a1a;
+            color: #e0e0e0;
+        }
+        h1 { color: #f59e0b; margin-bottom: 10px; }
+        .subtitle { color: #888; margin-bottom: 20px; }
+
+        .input-section {
+            margin-bottom: 20px;
+        }
+        textarea {
+            width: 100%;
+            height: 150px;
+            padding: 12px;
+            font-size: 14px;
+            font-family: inherit;
+            background: #2a2a2a;
+            border: 1px solid #444;
+            border-radius: 8px;
+            color: #e0e0e0;
+            resize: vertical;
+        }
+        textarea:focus {
+            outline: none;
+            border-color: #f59e0b;
+        }
+
+        .buttons {
+            display: flex;
+            gap: 10px;
+            margin-top: 10px;
+        }
+        button {
+            padding: 10px 20px;
+            font-size: 14px;
+            font-weight: 600;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .btn-primary {
+            background: #f59e0b;
+            color: #000;
+        }
+        .btn-primary:hover { background: #d97706; }
+        .btn-primary:disabled {
+            background: #666;
+            cursor: not-allowed;
+        }
+        .btn-secondary {
+            background: #333;
+            color: #e0e0e0;
+            border: 1px solid #555;
+        }
+        .btn-secondary:hover { background: #444; }
+
+        .status {
+            margin: 15px 0;
+            padding: 10px 15px;
+            border-radius: 6px;
+            font-size: 14px;
+        }
+        .status.loading { background: #1e3a5f; color: #60a5fa; }
+        .status.success { background: #14532d; color: #4ade80; }
+        .status.error { background: #7f1d1d; color: #fca5a5; }
+
+        .results {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+            margin-top: 20px;
+        }
+
+        .panel {
+            background: #2a2a2a;
+            border-radius: 8px;
+            padding: 15px;
+        }
+        .panel h2 {
+            font-size: 16px;
+            color: #f59e0b;
+            margin: 0 0 15px 0;
+            padding-bottom: 10px;
+            border-bottom: 1px solid #444;
+        }
+
+        .entity-list {
+            max-height: 400px;
+            overflow-y: auto;
+        }
+        .entity-item {
+            padding: 10px;
+            margin-bottom: 8px;
+            background: #333;
+            border-radius: 6px;
+            font-size: 13px;
+        }
+        .entity-item:last-child { margin-bottom: 0; }
+
+        .entity-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 6px;
+        }
+        .entity-text {
+            font-weight: 600;
+            color: #fff;
+        }
+        .entity-type {
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-size: 11px;
+            font-weight: 600;
+        }
+        .entity-type.NOM { background: #3b82f6; color: #fff; }
+        .entity-type.ENTREPRISE { background: #8b5cf6; color: #fff; }
+        .entity-type.LIEU { background: #10b981; color: #fff; }
+        .entity-type.AUTRE { background: #6b7280; color: #fff; }
+        .entity-type.TÉLÉPHONE { background: #ec4899; color: #fff; }
+        .entity-type.EMAIL { background: #f97316; color: #fff; }
+        .entity-type.SIREN { background: #14b8a6; color: #fff; }
+        .entity-type.SIRET { background: #06b6d4; color: #fff; }
+        .entity-type.CAPITAL { background: #eab308; color: #000; }
+        .entity-type.ADRESSE { background: #a855f7; color: #fff; }
+        .entity-type.NIR { background: #ef4444; color: #fff; }
+
+        .entity-meta {
+            color: #888;
+            font-size: 12px;
+        }
+        .entity-meta span {
+            margin-right: 12px;
+        }
+        .source-ml { color: #60a5fa; }
+        .source-regex { color: #a78bfa; }
+
+        .raw-output {
+            font-family: 'Monaco', 'Menlo', monospace;
+            font-size: 12px;
+            white-space: pre-wrap;
+            word-break: break-all;
+            max-height: 400px;
+            overflow-y: auto;
+            color: #a0a0a0;
+        }
+
+        .anonymized-text {
+            font-size: 14px;
+            line-height: 1.6;
+            white-space: pre-wrap;
+        }
+        .anonymized-text .highlight {
+            background: #f59e0b33;
+            color: #f59e0b;
+            padding: 1px 4px;
+            border-radius: 3px;
+            font-weight: 600;
+        }
+
+        .empty { color: #666; font-style: italic; }
+
+        .sample-texts {
+            margin-top: 10px;
+        }
+        .sample-texts summary {
+            cursor: pointer;
+            color: #888;
+            font-size: 13px;
+        }
+        .sample-list {
+            margin-top: 10px;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+        }
+        .sample-btn {
+            padding: 6px 12px;
+            font-size: 12px;
+            background: #333;
+            border: 1px solid #555;
+        }
+
+        .stats-bar {
+            display: flex;
+            gap: 20px;
+            margin-bottom: 15px;
+            padding: 10px;
+            background: #333;
+            border-radius: 6px;
+        }
+        .stat {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+        .stat-label { color: #888; font-size: 12px; }
+        .stat-value { font-weight: 700; font-size: 14px; }
+        .stat-value.ml { color: #60a5fa; }
+        .stat-value.regex { color: #a78bfa; }
+    </style>
+</head>
+<body>
+    <h1>🔍 Test NER - Debug</h1>
+    <p class="subtitle">Testez la détection d'entités (ML + Regex) avec les mêmes fonctions que l'app principale</p>
+
+    <div class="input-section">
+        <textarea id="inputText" placeholder="Entrez du texte à analyser...">M. Jean-Pierre Dupont, gérant de la société TechCorp SAS au capital de 50 000 euros, immatriculée au RCS Paris sous le numéro 123 456 789, domicilié au 15 rue de la Paix, 75001 Paris, peut être contacté au 06 12 34 56 78 ou par email à jean.dupont@techcorp.fr.</textarea>
+
+        <div class="buttons">
+            <button id="analyzeBtn" class="btn-primary">🔍 Analyser</button>
+            <button id="clearBtn" class="btn-secondary">Effacer</button>
+        </div>
+
+        <details class="sample-texts">
+            <summary>Textes d'exemple</summary>
+            <div class="sample-list">
+                <button class="sample-btn" data-sample="simple">Nom simple</button>
+                <button class="sample-btn" data-sample="compound">Nom composé</button>
+                <button class="sample-btn" data-sample="company">Société</button>
+                <button class="sample-btn" data-sample="full">Document complet</button>
+                <button class="sample-btn" data-sample="capital">Capital social</button>
+            </div>
+        </details>
+    </div>
+
+    <div id="status" class="status loading" style="display: none;"></div>
+
+    <div class="results">
+        <div class="panel">
+            <h2>Entités détectées (<span id="entityCount">0</span>)</h2>
+            <div class="stats-bar">
+                <div class="stat">
+                    <span class="stat-label">ML (IA):</span>
+                    <span class="stat-value ml" id="mlCount">0</span>
+                </div>
+                <div class="stat">
+                    <span class="stat-label">Regex:</span>
+                    <span class="stat-value regex" id="regexCount">0</span>
+                </div>
+            </div>
+            <div id="entityList" class="entity-list">
+                <p class="empty">Cliquez sur "Analyser" pour détecter les entités</p>
+            </div>
+        </div>
+
+        <div class="panel">
+            <h2>Texte anonymisé</h2>
+            <div id="anonymizedText" class="anonymized-text">
+                <p class="empty">Le texte anonymisé apparaîtra ici</p>
+            </div>
+        </div>
+    </div>
+
+    <div class="results" style="margin-top: 20px;">
+        <div class="panel">
+            <h2>Détail ML (après agrégation custom)</h2>
+            <div id="mlRaw" class="raw-output">
+                <p class="empty">Résultats du modèle NER avec agrégation</p>
+            </div>
+        </div>
+
+        <div class="panel">
+            <h2>Détail Regex</h2>
+            <div id="regexRaw" class="raw-output">
+                <p class="empty">Entités détectées par regex</p>
+            </div>
+        </div>
+    </div>
+
+    <script type="module">
+        // Import functions from ml-anonymizer.js
+        import {
+            loadModel,
+            isModelReady,
+            setStatusCallback,
+            detectEntitiesML,
+            detectRegexEntities,
+            mergeEntities,
+            NER_TO_ENTITY_TYPE
+        } from './js/ml-anonymizer.js';
+
+        // Sample texts
+        const SAMPLES = {
+            simple: "Monsieur Pierre Martin habite à Lyon.",
+            compound: "M. Jean-Pierre de la Fontaine et Mme Marie-Claire Beaumont-Dupuis sont présents.",
+            company: "La société Acme Industries SAS, représentée par son président M. Robert Durand, et TechVentures SARL.",
+            full: `PACTE D'ACTIONNAIRES
+
+Entre les soussignés:
+
+1. M. François-Xavier Leblanc, né le 15 mars 1975 à Bordeaux, demeurant au 42 avenue des Champs-Élysées, 75008 Paris, de nationalité française, titulaire de la carte d'identité n° 123456789.
+
+2. La société MegaCorp Holding SAS, au capital de 1 500 000 euros, immatriculée au RCS de Nanterre sous le numéro 987 654 321 00015, dont le siège social est situé au 100 boulevard Haussmann, 75008 Paris, représentée par Mme Sophie Mercier en sa qualité de Directrice Générale.
+
+Contact: +33 1 23 45 67 89 / contact@megacorp.fr`,
+            capital: "La société a un capital social de 100 000 euros. Le capital de 250.000 € a été libéré. Capital: 1 000 000 euros."
+        };
+
+        // DOM
+        const inputText = document.getElementById('inputText');
+        const analyzeBtn = document.getElementById('analyzeBtn');
+        const clearBtn = document.getElementById('clearBtn');
+        const statusEl = document.getElementById('status');
+        const entityList = document.getElementById('entityList');
+        const entityCount = document.getElementById('entityCount');
+        const mlCountEl = document.getElementById('mlCount');
+        const regexCountEl = document.getElementById('regexCount');
+        const anonymizedText = document.getElementById('anonymizedText');
+        const mlRaw = document.getElementById('mlRaw');
+        const regexRaw = document.getElementById('regexRaw');
+
+        // Show status
+        function showStatus(message, type = 'loading') {
+            statusEl.textContent = message;
+            statusEl.className = `status ${type}`;
+            statusEl.style.display = 'block';
+        }
+
+        function hideStatus() {
+            statusEl.style.display = 'none';
+        }
+
+        // Set up status callback for model loading
+        setStatusCallback((message, progress) => {
+            if (progress !== null) {
+                showStatus(`${message} (${Math.round(progress * 100)}%)`);
+            } else {
+                showStatus(message);
+            }
+        });
+
+        // Analyze
+        async function analyze() {
+            const text = inputText.value.trim();
+            if (!text) {
+                alert('Entrez du texte à analyser');
+                return;
+            }
+
+            analyzeBtn.disabled = true;
+            showStatus('Analyse en cours...');
+
+            try {
+                // Load model if needed
+                if (!isModelReady()) {
+                    showStatus('Chargement du modèle NER...');
+                    await loadModel();
+                }
+
+                // ML detection with custom aggregation
+                showStatus('Détection ML en cours...');
+                const mlResult = await detectEntitiesML(text);
+                const mlEntities = mlResult.entities;
+
+                // Regex detection
+                const regexEntities = detectRegexEntities(text);
+
+                // Convert regex entities to same format
+                const formattedRegexEntities = regexEntities.map(e => ({
+                    ...e,
+                    text: e.original,
+                    source: 'regex'
+                }));
+
+                // Merge all entities
+                const allEntities = [...mlEntities, ...formattedRegexEntities];
+                const merged = mergeEntities(allEntities, text);
+
+                // Update counts
+                const finalMlCount = merged.filter(e => e.source === 'ml').length;
+                const finalRegexCount = merged.filter(e => e.source === 'regex').length;
+                mlCountEl.textContent = finalMlCount;
+                regexCountEl.textContent = finalRegexCount;
+
+                // Display results
+                displayEntities(merged);
+                displayAnonymized(text, merged);
+                displayRaw(mlResult, regexEntities);
+
+                showStatus('Analyse terminée!', 'success');
+                setTimeout(hideStatus, 2000);
+            } catch (error) {
+                console.error('Analysis error:', error);
+                showStatus('Erreur: ' + error.message, 'error');
+            } finally {
+                analyzeBtn.disabled = false;
+            }
+        }
+
+        // Display entities
+        function displayEntities(entities) {
+            entityCount.textContent = entities.length;
+
+            if (entities.length === 0) {
+                entityList.innerHTML = '<p class="empty">Aucune entité détectée</p>';
+                return;
+            }
+
+            entityList.innerHTML = entities.map(e => `
+                <div class="entity-item">
+                    <div class="entity-header">
+                        <span class="entity-text">"${escapeHtml(e.original || e.text)}"</span>
+                        <span class="entity-type ${e.type}">${e.type}</span>
+                    </div>
+                    <div class="entity-meta">
+                        <span class="${e.source === 'ml' ? 'source-ml' : 'source-regex'}">Source: ${e.source === 'ml' ? 'ML (IA)' : 'Regex'}</span>
+                        <span>Position: ${e.start}-${e.end}</span>
+                        ${e.score ? `<span>Score: ${(e.score * 100).toFixed(1)}%</span>` : ''}
+                        ${e.tokenCount ? `<span>Tokens: ${e.tokenCount}</span>` : ''}
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        // Display anonymized
+        function displayAnonymized(text, entities) {
+            if (entities.length === 0) {
+                anonymizedText.textContent = text;
+                return;
+            }
+
+            // Sort entities by position
+            const sorted = [...entities].sort((a, b) => a.start - b.start);
+
+            let html = '';
+            let lastEnd = 0;
+            const counters = {};
+
+            for (const e of sorted) {
+                html += escapeHtml(text.slice(lastEnd, e.start));
+
+                counters[e.type] = (counters[e.type] || 0) + 1;
+                const noCounter = ['TÉLÉPHONE', 'EMAIL', 'NIR', 'SIREN', 'SIRET', 'CAPITAL'];
+                const token = noCounter.includes(e.type) ? `[${e.type}]` : `[${e.type}_${counters[e.type]}]`;
+
+                html += `<span class="highlight">${token}</span>`;
+                lastEnd = e.end;
+            }
+            html += escapeHtml(text.slice(lastEnd));
+
+            anonymizedText.innerHTML = html;
+        }
+
+        // Display raw
+        function displayRaw(mlResult, regexEntities) {
+            if (mlResult && mlResult.entities) {
+                const display = {
+                    raw_tokens: mlResult.raw.length,
+                    after_aggregation: mlResult.aggregated.length,
+                    after_filtering: mlResult.filtered.length,
+                    final_entities: mlResult.entities.map(e => ({
+                        text: e.text,
+                        type: e.type,
+                        score: e.score?.toFixed(3),
+                        tokens: e.tokenCount,
+                        position: `${e.start}-${e.end}`
+                    }))
+                };
+                mlRaw.textContent = JSON.stringify(display, null, 2);
+            } else {
+                mlRaw.innerHTML = '<p class="empty">Modèle non chargé ou erreur</p>';
+            }
+
+            if (regexEntities.length > 0) {
+                regexRaw.textContent = JSON.stringify(regexEntities.map(e => ({
+                    text: e.original,
+                    type: e.type,
+                    position: `${e.start}-${e.end}`
+                })), null, 2);
+            } else {
+                regexRaw.innerHTML = '<p class="empty">Aucune entité regex détectée</p>';
+            }
+        }
+
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        // Events
+        analyzeBtn.addEventListener('click', analyze);
+        clearBtn.addEventListener('click', () => {
+            inputText.value = '';
+            entityList.innerHTML = '<p class="empty">Cliquez sur "Analyser" pour détecter les entités</p>';
+            entityCount.textContent = '0';
+            mlCountEl.textContent = '0';
+            regexCountEl.textContent = '0';
+            anonymizedText.innerHTML = '<p class="empty">Le texte anonymisé apparaîtra ici</p>';
+            mlRaw.innerHTML = '<p class="empty">Résultats du modèle NER avec agrégation</p>';
+            regexRaw.innerHTML = '<p class="empty">Entités détectées par regex</p>';
+        });
+
+        // Sample buttons
+        document.querySelectorAll('.sample-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                inputText.value = SAMPLES[btn.dataset.sample];
+            });
+        });
+
+        // Keyboard shortcut
+        inputText.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
+                analyze();
+            }
+        });
+
+        // Preload model on page load
+        loadModel().catch(err => {
+            console.warn('Model preload failed:', err);
+        });
+    </script>
+</body>
+</html>

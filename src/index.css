@@ -1,0 +1,241 @@
+@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ============================================
+   LBO ANONYMIZER - Professional Light Theme
+   Clean, corporate aesthetic for business users
+   ============================================ */
+
+:root {
+  /* Typography */
+  font-family: 'Plus Jakarta Sans', system-ui, sans-serif;
+  line-height: 1.5;
+  font-weight: 400;
+
+  /* Color scheme - Light */
+  color-scheme: light;
+  color: #1e293b;
+  background-color: #f8fafc;
+
+  /* Text rendering */
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+
+  /* Custom properties */
+  --primary: #2563eb;
+  --primary-light: #3b82f6;
+  --success: #16a34a;
+  --danger: #dc2626;
+  --surface-primary: #ffffff;
+  --surface-secondary: #f8fafc;
+  --surface-tertiary: #f1f5f9;
+  --border-light: #e2e8f0;
+  --border-medium: #cbd5e1;
+  --text-primary: #1e293b;
+  --text-secondary: #475569;
+  --text-muted: #94a3b8;
+}
+
+/* Base styles */
+body {
+  margin: 0;
+  min-height: 100vh;
+  background: var(--surface-secondary);
+}
+
+#root {
+  min-height: 100vh;
+}
+
+/* ============================================
+   ENTITY HIGHLIGHTS
+   ============================================ */
+
+.entity-highlight {
+  @apply absolute pointer-events-auto cursor-pointer;
+  opacity: 0.25;
+  transition: opacity 0.15s ease, transform 0.15s ease;
+  border-radius: 2px;
+}
+
+.entity-highlight:hover {
+  opacity: 0.45;
+}
+
+.entity-highlight.selected {
+  opacity: 0.5;
+  box-shadow: 0 0 0 2px currentColor;
+}
+
+/* Entity type colors */
+.entity-PERSON { @apply bg-entity-person; }
+.entity-ORGANIZATION { @apply bg-entity-organization; }
+.entity-ADDRESS { @apply bg-entity-address; }
+.entity-EMAIL { @apply bg-entity-email; }
+.entity-PHONE { @apply bg-entity-phone; }
+.entity-SSN { @apply bg-entity-ssn; }
+.entity-IBAN { @apply bg-entity-iban; }
+.entity-BANK_ACCOUNT { @apply bg-entity-bank; }
+.entity-CREDIT_CARD { @apply bg-entity-credit-card; }
+.entity-DATE { @apply bg-entity-date; }
+.entity-SIREN { @apply bg-entity-siren; }
+.entity-SIRET { @apply bg-entity-siret; }
+.entity-CAPITAL { @apply bg-entity-capital; }
+
+/* ============================================
+   SCROLLBAR STYLING
+   ============================================ */
+
+.pdf-viewer::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+.pdf-viewer::-webkit-scrollbar-track {
+  background: var(--surface-tertiary);
+}
+
+.pdf-viewer::-webkit-scrollbar-thumb {
+  background: var(--border-medium);
+  border-radius: 4px;
+}
+
+.pdf-viewer::-webkit-scrollbar-thumb:hover {
+  background: var(--text-muted);
+}
+
+/* ============================================
+   ANIMATIONS
+   ============================================ */
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+}
+
+@keyframes fade-slide-in {
+  0% {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.processing-pulse {
+  animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
+/* ============================================
+   TEXT LAYER (for native selection)
+   ============================================ */
+
+.text-layer {
+  z-index: 1;
+}
+
+.text-layer::selection,
+.text-layer *::selection {
+  background: rgba(37, 99, 235, 0.2);
+}
+
+/* ============================================
+   CUSTOM COMPONENTS
+   ============================================ */
+
+/* Card panels */
+.card {
+  background: var(--surface-primary);
+  border: 1px solid var(--border-light);
+  border-radius: 12px;
+  box-shadow: 0 1px 3px 0 rgb(0 0 0 / 0.05);
+}
+
+/* Primary button */
+.btn-primary {
+  @apply px-4 py-2 font-medium rounded-lg transition-all duration-150;
+  background: var(--primary);
+  color: white;
+  box-shadow: 0 1px 2px 0 rgb(37 99 235 / 0.2);
+}
+
+.btn-primary:hover {
+  background: var(--primary-light);
+  box-shadow: 0 2px 4px 0 rgb(37 99 235 / 0.3);
+}
+
+.btn-primary:active {
+  transform: translateY(0);
+}
+
+/* Secondary button */
+.btn-secondary {
+  @apply px-4 py-2 font-medium rounded-lg transition-all duration-150;
+  background: var(--surface-primary);
+  border: 1px solid var(--border-light);
+  color: var(--text-secondary);
+}
+
+.btn-secondary:hover {
+  background: var(--surface-tertiary);
+  border-color: var(--border-medium);
+  color: var(--text-primary);
+}
+
+/* Input styling */
+input[type="range"] {
+  @apply w-full h-1.5 rounded-full appearance-none cursor-pointer;
+  background: var(--surface-tertiary);
+}
+
+input[type="range"]::-webkit-slider-track {
+  @apply h-1.5 rounded-full;
+  background: var(--surface-tertiary);
+}
+
+input[type="range"]::-webkit-slider-thumb {
+  @apply appearance-none w-4 h-4 rounded-full cursor-pointer;
+  background: var(--primary);
+  border: 2px solid white;
+  box-shadow: 0 1px 3px rgb(0 0 0 / 0.2);
+  margin-top: -5px;
+  transition: transform 0.15s ease;
+}
+
+input[type="range"]::-webkit-slider-thumb:hover {
+  transform: scale(1.1);
+}
+
+/* Progress bar track */
+input[type="range"]::-webkit-slider-runnable-track {
+  @apply h-1.5 rounded-full;
+  background: linear-gradient(to right, var(--primary) var(--value, 0%), var(--surface-tertiary) var(--value, 0%));
+}
+
+/* Status indicator dot */
+.status-dot {
+  @apply w-2 h-2 rounded-full;
+}
+
+.status-dot.active {
+  background: var(--success);
+  box-shadow: 0 0 0 3px rgb(22 163 74 / 0.2);
+}
+
+/* ============================================
+   UTILITY CLASSES
+   ============================================ */
+
+.text-gradient {
+  background: linear-gradient(135deg, var(--primary), #60a5fa);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}

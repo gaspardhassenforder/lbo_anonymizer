@@ -1,0 +1,298 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>GLiNER Test</title>
+  <style>
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      max-width: 800px;
+      margin: 40px auto;
+      padding: 20px;
+      background: #1a1a2e;
+      color: #eee;
+    }
+    h1 { color: #00d4ff; }
+    .section {
+      background: #16213e;
+      border-radius: 8px;
+      padding: 20px;
+      margin: 20px 0;
+    }
+    .section h2 {
+      margin-top: 0;
+      color: #7b68ee;
+    }
+    button {
+      background: #7b68ee;
+      color: white;
+      border: none;
+      padding: 12px 24px;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 16px;
+      margin: 5px;
+    }
+    button:hover { background: #6a5acd; }
+    button:disabled {
+      background: #444;
+      cursor: not-allowed;
+    }
+    textarea {
+      width: 100%;
+      height: 100px;
+      background: #0f0f23;
+      color: #eee;
+      border: 1px solid #333;
+      border-radius: 4px;
+      padding: 10px;
+      font-size: 14px;
+      resize: vertical;
+    }
+    #log {
+      background: #0f0f23;
+      border-radius: 4px;
+      padding: 15px;
+      font-family: monospace;
+      font-size: 13px;
+      white-space: pre-wrap;
+      max-height: 400px;
+      overflow-y: auto;
+    }
+    .log-info { color: #00d4ff; }
+    .log-success { color: #00ff88; }
+    .log-error { color: #ff6b6b; }
+    .log-warn { color: #ffd93d; }
+    .entity {
+      display: inline-block;
+      padding: 2px 8px;
+      margin: 2px;
+      border-radius: 4px;
+      font-size: 13px;
+    }
+    .entity-PERSON { background: #e74c3c; }
+    .entity-ORGANIZATION { background: #9b59b6; }
+    .entity-ADDRESS { background: #3498db; }
+    .entity-EMAIL { background: #1abc9c; }
+    .entity-PHONE { background: #f39c12; }
+    .entity-DATE { background: #e67e22; }
+    .entity-SSN { background: #c0392b; }
+    .entity-IBAN { background: #27ae60; }
+    #results { margin-top: 15px; }
+  </style>
+</head>
+<body>
+  <h1>🔬 GLiNER Integration Test</h1>
+
+  <div class="section">
+    <h2>1. Load Model</h2>
+    <p>This will initialize GLiNER with the PII model (~349MB download)</p>
+    <button id="loadBtn" onclick="loadModel()">Load GLiNER Model</button>
+    <span id="loadStatus"></span>
+  </div>
+
+  <div class="section">
+    <h2>2. Test Inference</h2>
+    <textarea id="testText">Jean Dupont, né le 15/03/1985, habite 123 rue de Paris.
+Email: jean.dupont@email.com, Tel: 06 12 34 56 78
+Son numéro de sécurité sociale est 1 85 03 75 108 042 35.
+IBAN: FR76 3000 6000 0112 3456 7890 189</textarea>
+    <br><br>
+    <button id="inferBtn" onclick="runInference()" disabled>Run Inference</button>
+    <div id="results"></div>
+  </div>
+
+  <div class="section">
+    <h2>Console Log</h2>
+    <button onclick="clearLog()">Clear</button>
+    <div id="log"></div>
+  </div>
+
+  <script type="module">
+    // Configuration - same as what we'll use in gliner.ts
+    const MODEL_ID = 'onnx-community/gliner_multi_pii-v1';
+    const ONNX_MODEL_URL = `https://huggingface.co/${MODEL_ID}/resolve/main/onnx/model_quantized.onnx`;
+
+    // Entity labels to detect
+    const ENTITY_LABELS = [
+      'person',
+      'organization',
+      'company',
+      'address',
+      'location',
+      'email',
+      'phone number',
+      'date',
+      'money',
+      'credit card number',
+      'social security number',
+      'bank account',
+      'iban',
+    ];
+
+    // Label mapping
+    const LABEL_MAP = {
+      'person': 'PERSON',
+      'organization': 'ORGANIZATION',
+      'company': 'ORGANIZATION',
+      'address': 'ADDRESS',
+      'location': 'ADDRESS',
+      'email': 'EMAIL',
+      'phone number': 'PHONE',
+      'date': 'DATE',
+      'money': 'CAPITAL',
+      'credit card number': 'CREDIT_CARD',
+      'social security number': 'SSN',
+      'bank account': 'BANK_ACCOUNT',
+      'iban': 'IBAN',
+    };
+
+    let gliner = null;
+
+    // Logging helper
+    function log(message, type = 'info') {
+      const logEl = document.getElementById('log');
+      const timestamp = new Date().toLocaleTimeString();
+      logEl.innerHTML += `<span class="log-${type}">[${timestamp}] ${message}</span>\n`;
+      logEl.scrollTop = logEl.scrollHeight;
+    }
+
+    window.clearLog = function() {
+      document.getElementById('log').innerHTML = '';
+    };
+
+    // Load model
+    window.loadModel = async function() {
+      const btn = document.getElementById('loadBtn');
+      const status = document.getElementById('loadStatus');
+
+      btn.disabled = true;
+      status.textContent = 'Loading...';
+
+      log('Starting GLiNER model load...', 'info');
+      log(`Model ID: ${MODEL_ID}`, 'info');
+      log(`ONNX URL: ${ONNX_MODEL_URL}`, 'info');
+      log(`WASM Path: CDN default`, 'info');
+
+      const startTime = performance.now();
+
+      try {
+        // Dynamic import of gliner
+        log('Importing GLiNER module...', 'info');
+        const { Gliner } = await import('gliner');
+        log('GLiNER module imported successfully', 'success');
+
+        // Create instance with fixed configuration
+        // Note: wasmPaths defaults to CDN (https://cdn.jsdelivr.net/npm/onnxruntime-web@1.19.2/dist/)
+        log('Creating GLiNER instance...', 'info');
+        gliner = new Gliner({
+          tokenizerPath: MODEL_ID,
+          onnxSettings: {
+            modelPath: ONNX_MODEL_URL,      // FIX: Actual .onnx file URL
+            executionProvider: 'wasm',
+            multiThread: false,              // Disable threading for broader compatibility
+          },
+          maxWidth: 12,
+        });
+        log('GLiNER instance created', 'success');
+
+        // Initialize (this downloads the model)
+        log('Initializing model (downloading ~349MB)...', 'info');
+        await gliner.initialize();
+
+        const elapsed = ((performance.now() - startTime) / 1000).toFixed(2);
+        log(`Model loaded successfully in ${elapsed}s`, 'success');
+
+        status.textContent = `✓ Loaded in ${elapsed}s`;
+        document.getElementById('inferBtn').disabled = false;
+
+      } catch (error) {
+        log(`Error: ${error.message}`, 'error');
+        if (error.cause) {
+          log(`Cause: ${JSON.stringify(error.cause)}`, 'error');
+        }
+        log(`Stack: ${error.stack}`, 'error');
+
+        // Check for SharedArrayBuffer
+        if (typeof SharedArrayBuffer === 'undefined') {
+          log('SharedArrayBuffer is NOT available - this may be the issue!', 'warn');
+          log('Ensure COOP/COEP headers are set on the server.', 'warn');
+        } else {
+          log('SharedArrayBuffer IS available', 'info');
+        }
+
+        status.textContent = '✗ Failed';
+        btn.disabled = false;
+      }
+    };
+
+    // Run inference
+    window.runInference = async function() {
+      const text = document.getElementById('testText').value;
+      const resultsEl = document.getElementById('results');
+
+      if (!gliner) {
+        log('Model not loaded!', 'error');
+        return;
+      }
+
+      log(`Running inference on ${text.length} characters...`, 'info');
+      const startTime = performance.now();
+
+      try {
+        const predictions = await gliner.inference({
+          texts: [text],
+          entities: ENTITY_LABELS,
+          threshold: 0.25,
+          flatNer: true,
+        });
+
+        const elapsed = ((performance.now() - startTime) / 1000).toFixed(3);
+        log(`Inference completed in ${elapsed}s`, 'success');
+
+        // Display results
+        resultsEl.innerHTML = '<h3>Detected Entities:</h3>';
+
+        if (predictions && predictions[0] && predictions[0].length > 0) {
+          for (const pred of predictions[0]) {
+            const mappedLabel = LABEL_MAP[pred.label.toLowerCase()] || pred.label;
+            log(`Found: "${pred.spanText}" → ${mappedLabel} (score: ${pred.score.toFixed(3)})`, 'success');
+
+            resultsEl.innerHTML += `
+              <span class="entity entity-${mappedLabel}">
+                ${pred.spanText} <small>(${mappedLabel}, ${(pred.score * 100).toFixed(1)}%)</small>
+              </span>
+            `;
+          }
+        } else {
+          log('No entities detected', 'warn');
+          resultsEl.innerHTML += '<p>No entities detected</p>';
+        }
+
+      } catch (error) {
+        log(`Inference error: ${error.message}`, 'error');
+        resultsEl.innerHTML = `<p style="color: #ff6b6b">Error: ${error.message}</p>`;
+      }
+    };
+
+    // Initial log
+    log('Test page loaded. Click "Load GLiNER Model" to start.', 'info');
+
+    // Check browser capabilities
+    if (typeof SharedArrayBuffer !== 'undefined') {
+      log('✓ SharedArrayBuffer is available', 'success');
+    } else {
+      log('✗ SharedArrayBuffer is NOT available - threading will not work', 'error');
+      log('This requires Cross-Origin-Opener-Policy and Cross-Origin-Embedder-Policy headers', 'warn');
+    }
+
+    // Check crossOriginIsolated
+    if (self.crossOriginIsolated) {
+      log('✓ Page is cross-origin isolated', 'success');
+    } else {
+      log('✗ Page is NOT cross-origin isolated', 'warn');
+    }
+  </script>
+</body>
+</html>

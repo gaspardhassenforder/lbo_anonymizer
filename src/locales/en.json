@@ -1,0 +1,181 @@
+{
+  "app": {
+    "title": "LBO Anonymizer",
+    "subtitle": "Protect sensitive data in your confidential documents"
+  },
+  "login": {
+    "title": "Sign In",
+    "subtitle": "Sign in to access your documents",
+    "username": "Username",
+    "usernamePlaceholder": "Enter your username",
+    "password": "Password",
+    "passwordPlaceholder": "Enter your password",
+    "submit": "Sign In",
+    "loggingIn": "Signing in...",
+    "error": "Invalid username or password",
+    "demoHint": "Demo credentials: admin / admin"
+  },
+  "landing": {
+    "badge": "Your files stay on your computer",
+    "description": "Automatically detect and redact sensitive information in PDF documents",
+    "footer": "Automatic detection powered by artificial intelligence"
+  },
+  "dropzone": {
+    "title": "Drop your PDF here",
+    "titleDragOver": "Release to upload",
+    "browse": "or click to browse",
+    "privacyBadge": "Your data never leaves your browser",
+    "loadingModels": "Loading AI models...",
+    "modelsReady": "Models ready"
+  },
+  "toolbar": {
+    "pdf": "PDF",
+    "pages": "{{count}} page",
+    "pages_plural": "{{count}} pages",
+    "undo": "Undo",
+    "redo": "Redo",
+    "zoomOut": "Zoom out",
+    "zoomIn": "Zoom in",
+    "resetZoom": "Reset zoom",
+    "exportJson": "Export JSON",
+    "exportPdf": "Export PDF",
+    "newFile": "New file",
+    "confirmAnonymisation": "Confirm"
+  },
+  "documents": {
+    "title": "Your Documents",
+    "subtitle": "View and manage your anonymized documents",
+    "loadNew": "Load New Document",
+    "logout": "Logout",
+    "loading": "Loading documents...",
+    "loadError": "Failed to load documents",
+    "retry": "Try again",
+    "empty": "No documents yet",
+    "emptyHint": "Upload and anonymize your first document to see it here",
+    "pages": "{{count}} page",
+    "pages_plural": "{{count}} pages",
+    "entities": "{{count}} entity",
+    "entities_plural": "{{count}} entities",
+    "view": "View",
+    "download": "Download",
+    "delete": "Delete",
+    "rename": "Rename",
+    "confirmDelete": "Are you sure you want to delete this document?",
+    "viewNotImplemented": "Viewing documents is not implemented yet",
+    "downloadError": "Failed to download document",
+    "generating": "Generating...",
+    "deleteError": "Failed to delete document",
+    "renameError": "Failed to rename document"
+  },
+  "sidebar": {
+    "title": "Detected Entities",
+    "subtitle": "Click to select, hover to preview",
+    "confidence": "Certainty level",
+    "confidenceAll": "All",
+    "confidenceHigh": "High certainty",
+    "noEntities": "No entities detected",
+    "noEntitiesHint": "Try lowering the certainty level",
+    "tagMapping": "Tag Mapping",
+    "moreItems": "+{{count}} more..."
+  },
+  "processing": {
+    "loadingPdf": "Loading document",
+    "loadingPdfMessage": "Opening PDF...",
+    "extractingText": "Extracting text",
+    "extractingTextMessage": "Reading document content...",
+    "runningOcr": "Reading document",
+    "runningOcrMessage": "Analyzing page {{page}}...",
+    "loadingModel": "Preparing analysis",
+    "loadingModelMessage": "Loading detection engine...",
+    "detectingEntities": "Identifying sensitive data",
+    "detectingEntitiesMessage": "Scanning for personal information...",
+    "generatingPdf": "Creating PDF",
+    "generatingPdfMessage": "Generating anonymized document...",
+    "uploadingDocument": "Uploading document...",
+    "processingLocally": "Your data is processed locally",
+    "processing": "Processing..."
+  },
+  "dialogs": {
+    "removeAnnotation": "Remove annotation",
+    "removeAllInstances": "Found {{count}} instances of \"{{text}}\".\n\nDo you want to remove all instances?",
+    "removeAll": "Remove all",
+    "removeThisOne": "Remove this one",
+    "applyToAll": "Apply to all instances",
+    "foundOccurrences": "Found {{count}} occurrences of \"{{text}}\" in the document.",
+    "annotateAllAs": "Do you want to annotate all of them as {{label}}?",
+    "annotateAll": "Annotate all",
+    "annotateThisOne": "Annotate this one",
+    "confirm": "Confirm",
+    "cancel": "Cancel",
+    "changeLabelTitle": "Change label",
+    "changeLabelMessage": "Found {{count}} instances of \"{{text}}\".\n\nChange all to {{label}}?",
+    "changeAll": "Change all",
+    "changeThisOne": "Change this one"
+  },
+  "popover": {
+    "changeLabel": "Change label",
+    "remove": "Remove",
+    "back": "Back",
+    "selectEntityType": "Select entity type",
+    "matchesFound": "{{count}} matches found in document",
+    "confidence": "{{value}}% certainty"
+  },
+  "source": {
+    "ner": "AI",
+    "regex": "Automatic",
+    "user": "Manual"
+  },
+  "entities": {
+    "PERSON": "Person",
+    "ORGANIZATION": "Organization",
+    "ADDRESS": "Address",
+    "EMAIL": "Email",
+    "PHONE": "Phone",
+    "SSN": "Social Security #",
+    "IBAN": "IBAN",
+    "BANK_ACCOUNT": "Bank Account",
+    "CREDIT_CARD": "Credit Card",
+    "DATE": "Date",
+    "SIREN": "SIREN",
+    "SIRET": "SIRET",
+    "CAPITAL": "Capital"
+  },
+  "privacy": {
+    "title": "Your data is protected",
+    "description": "No data is sent to the internet. All processing happens directly on your computer.",
+    "localProcessing": "100% local processing",
+    "noUpload": "Files are never uploaded",
+    "instant": "Instant analysis"
+  },
+  "scope": {
+    "thisInstance": "This instance only",
+    "thisInstanceDesc": "Modify only this occurrence",
+    "wholeDocument": "In whole document",
+    "wholeDocumentDesc": "Modify all {{count}} occurrences in this document",
+    "allDocuments": "In all your documents",
+    "allDocumentsDesc": "Modify in all your current and future documents",
+    "futureDocuments": "Apply to future documents",
+    "futureDocumentsDesc": "This change will apply to all documents you process in the future",
+    "selectScope": "Select scope",
+    "addTitle": "Add annotation",
+    "removeTitle": "Remove annotation",
+    "changeLabelTitle": "Change label"
+  },
+  "common": {
+    "page": "p.",
+    "noFile": "No file"
+  },
+  "editor": {
+    "unsavedChangesWarning": "You have unsaved changes. Are you sure you want to leave?"
+  },
+  "viewer": {
+    "pagePending": "Pending...",
+    "pageProcessing": "Processing...",
+    "pageError": "Processing failed",
+    "previousPage": "Previous page",
+    "nextPage": "Next page",
+    "pageOf": "Page {{current}} / {{total}}",
+    "pagesProcessed": "{{count}}/{{total}} processed",
+    "allProcessed": "All processed"
+  }
+}
