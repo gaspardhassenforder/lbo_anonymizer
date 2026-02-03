@@ -7,8 +7,6 @@ import { useStore, getInstanceCount, normalizeText } from '../state/store'
 import { loadPdf } from '../pdf/pdfLoader'
 import { propagateEntities } from '../ner/propagate'
 import { createSpan } from '../tagging/applyEdits'
-import { exportAndDownloadJson } from '../export/exportJson'
-import { exportAndDownloadPdf } from '../export/exportHybridPdf'
 import { useModelLoader } from '../hooks/useModelLoader'
 import { processDocumentProgressively } from '../processing/pageProcessor'
 import { storePdf, loadPdf as loadStoredPdf, clearPdf, arrayBufferToFile } from '../state/pdfPersistence'
@@ -49,7 +47,6 @@ export default function App() {
   const file = useStore((state) => state.file)
   const pages = useStore((state) => state.pages)
   const spans = useStore((state) => state.spans)
-  const tagMap = useStore((state) => state.tagMap)
   const selectedSpanId = useStore((state) => state.selectedSpanId)
   const confidenceThreshold = useStore((state) => state.confidenceThreshold)
   const zoom = useStore((state) => state.zoom)
@@ -771,74 +768,6 @@ export default function App() {
     return count
   }, [pages])
 
-  // Export handlers
-  const handleExportJson = useCallback(() => {
-    if (pages.length === 0) return
-    const filteredSpans = spans.filter((s) => s.confidence >= confidenceThreshold)
-    const filename =
-      (loadedDocumentId ? getSavedDocument(loadedDocumentId)?.filename : null) ??
-      file?.name ??
-      'document.pdf'
-    exportAndDownloadJson(filename, pages, filteredSpans, tagMap)
-  }, [file, pages, spans, tagMap, confidenceThreshold, loadedDocumentId, getSavedDocument])
-
-  const handleExportPdf = useCallback(async () => {
-    if (!pdfDocument || pages.length === 0) return
-
-    setProcessing({
-      stage: 'loading-pdf',
-      progress: 0,
-      message: t('processing.generatingPdfMessage'),
-    })
-
-    try {
-      const filteredSpans = spans.filter((s) => s.confidence >= confidenceThreshold)
-      const filename =
-        (loadedDocumentId ? getSavedDocument(loadedDocumentId)?.filename : null) ??
-        file?.name ??
-        'document.pdf'
-      await exportAndDownloadPdf(
-        pdfDocument,
-        pages,
-        filteredSpans,
-        tagMap,
-        filename,
-        (progress) => {
-          setProcessing({
-            stage: 'loading-pdf',
-            progress: Math.round((progress.current / progress.total) * 100),
-            message: t('processing.generatingPdfMessage'),
-          })
-        }
-      )
-
-      setProcessing({
-        stage: 'ready',
-        progress: 100,
-        message: 'Ready',
-      })
-    } catch (error) {
-      console.error('Error exporting PDF:', error)
-      setProcessing({
-        stage: 'ready',
-        progress: 100,
-        message: 'Ready',
-      })
-    }
-  }, [pdfDocument, pages, spans, tagMap, confidenceThreshold, setProcessing, loadedDocumentId, getSavedDocument, file, t])
-
-  // Reset handler
-  const handleReset = useCallback(async () => {
-    setPdfDocument(null)
-    reset()
-    // Clear IndexedDB storage
-    try {
-      await clearPdf()
-    } catch (e) {
-      console.warn('[App] Failed to clear PDF from IndexedDB:', e)
-    }
-  }, [reset])
-
   // Confirm anonymisation handler - saves to Zustand store and navigates to documents
   const handleConfirmAnonymisation = useCallback(async () => {
     if (!pdfDocument || pages.length === 0) {
@@ -993,10 +922,7 @@ export default function App() {
       <Toolbar
         filename={((loadedDocumentId ? getSavedDocument(loadedDocumentId)?.filename : null) ?? file?.name) ?? null}
         pageCount={totalPageCount || pages.length}
-        onExportJson={handleExportJson}
-        onExportPdf={handleExportPdf}
         onConfirmAnonymisation={handleConfirmAnonymisation}
-        onReset={handleReset}
         onToggleLanguage={toggleLanguage}
         currentLanguage={i18n.language}
       />
@@ -1036,7 +962,6 @@ export default function App() {
         {/* Sidebar */}
         <Sidebar
           spans={spans}
-          tagMap={tagMap}
           selectedSpanId={selectedSpanId}
           confidenceThreshold={confidenceThreshold}
           onSpanSelect={setSelectedSpan}
@@ -1045,6 +970,11 @@ export default function App() {
           onPageNavigate={setCurrentPage}
           onConfidenceChange={setConfidenceThreshold}
           getInstanceCount={getInstanceCount}
+          hasMultipleDocuments={savedDocuments.length > 1}
+          onSpanLabelChange={handleSpanLabelChange}
+          onSpanLabelChangeAll={handleSpanLabelChangeAll}
+          onSpanRemoveAllDocuments={handleRemoveAllDocuments}
+          onSpanLabelChangeAllDocuments={handleSpanLabelChangeAllDocuments}
         />
       </div>
 

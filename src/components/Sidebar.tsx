@@ -1,12 +1,12 @@
-import { useMemo, useState } from 'react'
+import { useMemo, useState, useRef, useEffect } from 'react'
 import { useTranslation } from 'react-i18next'
-import type { DetectedSpan, EntityLabel, TagEntry } from '../types'
+import type { DetectedSpan, EntityLabel } from '../types'
 import { ENTITY_COLORS, ENTITY_LABELS } from '../types'
 import { ConfirmDialog } from './ConfirmDialog'
+import { ScopeSelectionDialog, ScopeOption } from './ScopeSelectionDialog'
 
 interface SidebarProps {
   spans: DetectedSpan[]
-  tagMap: Map<string, TagEntry>
   selectedSpanId: string | null
   confidenceThreshold: number
   onSpanSelect: (spanId: string | null) => void
@@ -15,6 +15,11 @@ interface SidebarProps {
   onPageNavigate: (pageIndex: number) => void
   onConfidenceChange: (threshold: number) => void
   getInstanceCount: (normalizedText: string) => number
+  hasMultipleDocuments?: boolean
+  onSpanLabelChange?: (spanId: string, label: EntityLabel) => void
+  onSpanLabelChangeAll?: (normalizedText: string, label: EntityLabel) => void
+  onSpanRemoveAllDocuments?: (normalizedText: string) => void
+  onSpanLabelChangeAllDocuments?: (normalizedText: string, label: EntityLabel) => void
 }
 
 // Normalize text for consistent comparison
@@ -24,7 +29,6 @@ function normalizeText(text: string): string {
 
 export function Sidebar({
   spans,
-  tagMap,
   selectedSpanId,
   confidenceThreshold,
   onSpanSelect,
@@ -33,9 +37,36 @@ export function Sidebar({
   onPageNavigate,
   onConfidenceChange,
   getInstanceCount,
+  hasMultipleDocuments = false,
+  onSpanLabelChange,
+  onSpanLabelChangeAll,
+  onSpanRemoveAllDocuments,
+  onSpanLabelChangeAllDocuments,
 }: SidebarProps) {
   const { t } = useTranslation()
   const [removeConfirmSpan, setRemoveConfirmSpan] = useState<DetectedSpan | null>(null)
+  const [removeScopeSpan, setRemoveScopeSpan] = useState<DetectedSpan | null>(null)
+  const [labelScopeSpan, setLabelScopeSpan] = useState<DetectedSpan | null>(null)
+  const [labelScopeLabel, setLabelScopeLabel] = useState<EntityLabel | null>(null)
+  const [labelPickerSpanId, setLabelPickerSpanId] = useState<string | null>(null)
+  const [labelChangeConfirmSpan, setLabelChangeConfirmSpan] = useState<DetectedSpan | null>(null)
+  const [labelChangeConfirmLabel, setLabelChangeConfirmLabel] = useState<EntityLabel | null>(null)
+  const labelPickerRef = useRef<HTMLDivElement>(null)
+
+  // Close label picker on click outside
+  useEffect(() => {
+    if (!labelPickerSpanId) return
+    const handleClickOutside = (e: MouseEvent) => {
+      if (labelPickerRef.current && !labelPickerRef.current.contains(e.target as Node)) {
+        setLabelPickerSpanId(null)
+      }
+    }
+    const id = setTimeout(() => document.addEventListener('mousedown', handleClickOutside), 0)
+    return () => {
+      clearTimeout(id)
+      document.removeEventListener('mousedown', handleClickOutside)
+    }
+  }, [labelPickerSpanId])
 
   // Group spans by label
   const groupedSpans = useMemo(() => {
@@ -73,6 +104,69 @@ export function Sidebar({
   const totalCount = useMemo(() => {
     return spans.filter((s) => s.confidence >= confidenceThreshold).length
   }, [spans, confidenceThreshold])
+
+  const handleRemoveClick = (span: DetectedSpan) => {
+    const instanceCount = getInstanceCount(normalizeText(span.text))
+    if (onSpanRemoveAllDocuments) {
+      setRemoveScopeSpan(span)
+    } else if (instanceCount > 1) {
+      setRemoveConfirmSpan(span)
+    } else {
+      onSpanRemove(span.id)
+    }
+  }
+
+  const handleRemoveScopeSelect = (scope: ScopeOption) => {
+    if (!removeScopeSpan) return
+    const norm = normalizeText(removeScopeSpan.text)
+    switch (scope) {
+      case 'this_instance':
+        onSpanRemove(removeScopeSpan.id)
+        break
+      case 'whole_document':
+        onSpanRemoveAllByText(norm)
+        break
+      case 'all_documents':
+      case 'future_documents':
+        onSpanRemoveAllDocuments?.(norm)
+        break
+    }
+    setRemoveScopeSpan(null)
+  }
+
+  const handleLabelClick = (span: DetectedSpan, label: EntityLabel) => {
+    setLabelPickerSpanId(null)
+    if (label === span.label) return
+    const instanceCount = getInstanceCount(normalizeText(span.text))
+    if (onSpanLabelChangeAllDocuments) {
+      setLabelScopeSpan(span)
+      setLabelScopeLabel(label)
+    } else if (instanceCount > 1 && onSpanLabelChangeAll) {
+      setLabelChangeConfirmSpan(span)
+      setLabelChangeConfirmLabel(label)
+    } else if (onSpanLabelChange) {
+      onSpanLabelChange(span.id, label)
+    }
+  }
+
+  const handleLabelScopeSelect = (scope: ScopeOption) => {
+    if (!labelScopeSpan || !labelScopeLabel) return
+    const norm = normalizeText(labelScopeSpan.text)
+    switch (scope) {
+      case 'this_instance':
+        onSpanLabelChange?.(labelScopeSpan.id, labelScopeLabel)
+        break
+      case 'whole_document':
+        onSpanLabelChangeAll?.(norm, labelScopeLabel)
+        break
+      case 'all_documents':
+      case 'future_documents':
+        onSpanLabelChangeAllDocuments?.(norm, labelScopeLabel)
+        break
+    }
+    setLabelScopeSpan(null)
+    setLabelScopeLabel(null)
+  }
 
   return (
     <div className="w-80 bg-white border-l border-slate-200 flex flex-col h-full shadow-sm">
@@ -198,22 +292,45 @@ export function Sidebar({
                             )}
                           </div>
                         </div>
-                        <button
-                          className="p-1.5 rounded-md text-slate-400 hover:text-danger-500 hover:bg-danger-50 transition-colors"
-                          onClick={(e) => {
-                            e.stopPropagation()
-                            if (instanceCount > 1) {
-                              setRemoveConfirmSpan(span)
-                            } else {
-                              onSpanRemove(span.id)
-                            }
-                          }}
-                          title={t('popover.remove')}
-                        >
-                          <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                            <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-                          </svg>
-                        </button>
+                        <div className="flex items-center gap-0.5" onClick={(e) => e.stopPropagation()}>
+                          {onSpanLabelChange && (
+                            <div className="relative" ref={labelPickerSpanId === span.id ? labelPickerRef : undefined}>
+                              <button
+                                className="p-1.5 rounded-md text-slate-400 hover:text-primary-600 hover:bg-primary-50 transition-colors"
+                                onClick={() => setLabelPickerSpanId(labelPickerSpanId === span.id ? null : span.id)}
+                                title={t('popover.changeLabel')}
+                              >
+                                <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                  <path strokeLinecap="round" strokeLinejoin="round" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
+                                </svg>
+                              </button>
+                              {labelPickerSpanId === span.id && (
+                                <div className="absolute right-0 top-full mt-1 z-50 py-1 bg-white border border-slate-200 rounded-lg shadow-lg min-w-[140px] max-h-48 overflow-y-auto">
+                                  {ENTITY_LABELS.map((entityLabel) => (
+                                    <button
+                                      key={entityLabel}
+                                      className="w-full px-3 py-2 text-left text-sm flex items-center gap-2 hover:bg-slate-50 rounded-none first:rounded-t-lg last:rounded-b-lg"
+                                      style={{ color: span.label === entityLabel ? 'var(--color-primary-600)' : undefined }}
+                                      onClick={() => handleLabelClick(span, entityLabel)}
+                                    >
+                                      <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: ENTITY_COLORS[entityLabel] }} />
+                                      {t(`entities.${entityLabel}`)}
+                                    </button>
+                                  ))}
+                                </div>
+                              )}
+                            </div>
+                          )}
+                          <button
+                            className="p-1.5 rounded-md text-slate-400 hover:text-danger-500 hover:bg-danger-50 transition-colors"
+                            onClick={() => handleRemoveClick(span)}
+                            title={t('popover.remove')}
+                          >
+                            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                              <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                            </svg>
+                          </button>
+                        </div>
                       </div>
                     </div>
                   )
@@ -224,36 +341,7 @@ export function Sidebar({
         )}
       </div>
 
-      {/* Tag map summary */}
-      {tagMap.size > 0 && (
-        <div className="p-5 border-t border-slate-200 bg-slate-50">
-          <div className="flex items-center gap-2 mb-3">
-            <svg className="w-4 h-4 text-slate-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
-            </svg>
-            <h3 className="text-sm font-medium text-slate-600">{t('sidebar.tagMapping')}</h3>
-          </div>
-          <div className="space-y-1.5 max-h-32 overflow-y-auto text-xs">
-            {Array.from(tagMap.entries()).slice(0, 10).map(([key, entry]) => (
-              <div key={key} className="flex items-center gap-2 text-slate-500">
-                <code className="text-primary-600 font-medium">{entry.tag}</code>
-                <span className="text-slate-300">→</span>
-                <span className="truncate flex-1" title={key}>{key}</span>
-                {entry.count > 1 && (
-                  <span className="text-slate-400">×{entry.count}</span>
-                )}
-              </div>
-            ))}
-            {tagMap.size > 10 && (
-              <p className="text-slate-400 italic pt-1">
-                {t('sidebar.moreItems', { count: tagMap.size - 10 })}
-              </p>
-            )}
-          </div>
-        </div>
-      )}
-
-      {/* Remove confirmation dialog */}
+      {/* Remove confirmation dialog (when scope dialog not used) */}
       {removeConfirmSpan && (
         <ConfirmDialog
           title={t('dialogs.removeAnnotation')}
@@ -275,6 +363,67 @@ export function Sidebar({
           }}
           onTertiary={() => {
             setRemoveConfirmSpan(null)
+          }}
+        />
+      )}
+
+      {/* Remove scope selection dialog */}
+      {removeScopeSpan && (
+        <ScopeSelectionDialog
+          title={t('scope.removeTitle')}
+          message={t('scope.selectScope')}
+          entityText={removeScopeSpan.text}
+          instanceCount={getInstanceCount(normalizeText(removeScopeSpan.text))}
+          hasMultipleDocuments={hasMultipleDocuments}
+          alwaysShowFutureOption
+          onSelect={handleRemoveScopeSelect}
+          onCancel={() => setRemoveScopeSpan(null)}
+        />
+      )}
+
+      {/* Label change confirmation (when scope dialog not used) */}
+      {labelChangeConfirmSpan && labelChangeConfirmLabel && (
+        <ConfirmDialog
+          title={t('dialogs.changeLabelTitle')}
+          message={t('dialogs.changeLabelMessage', {
+            count: getInstanceCount(normalizeText(labelChangeConfirmSpan.text)),
+            text: labelChangeConfirmSpan.text,
+            label: t(`entities.${labelChangeConfirmLabel}`)
+          })}
+          confirmText={t('dialogs.changeAll')}
+          cancelText={t('dialogs.changeThisOne')}
+          tertiaryText={t('dialogs.cancel')}
+          confirmVariant="primary"
+          onConfirm={() => {
+            onSpanLabelChangeAll?.(normalizeText(labelChangeConfirmSpan.text), labelChangeConfirmLabel)
+            setLabelChangeConfirmSpan(null)
+            setLabelChangeConfirmLabel(null)
+          }}
+          onCancel={() => {
+            onSpanLabelChange?.(labelChangeConfirmSpan.id, labelChangeConfirmLabel)
+            setLabelChangeConfirmSpan(null)
+            setLabelChangeConfirmLabel(null)
+          }}
+          onTertiary={() => {
+            setLabelChangeConfirmSpan(null)
+            setLabelChangeConfirmLabel(null)
+          }}
+        />
+      )}
+
+      {/* Label change scope selection dialog */}
+      {labelScopeSpan && labelScopeLabel && (
+        <ScopeSelectionDialog
+          title={t('scope.changeLabelTitle')}
+          message={t('scope.selectScope')}
+          entityText={labelScopeSpan.text}
+          instanceCount={getInstanceCount(normalizeText(labelScopeSpan.text))}
+          hasMultipleDocuments={hasMultipleDocuments}
+          alwaysShowFutureOption
+          onSelect={handleLabelScopeSelect}
+          onCancel={() => {
+            setLabelScopeSpan(null)
+            setLabelScopeLabel(null)
           }}
         />
       )}

@@ -33,15 +33,11 @@ export type EntityLabel =
   | 'ADDRESS'
   | 'EMAIL'
   | 'PHONE'
-  | 'SSN'
   | 'IBAN'
-  | 'BANK_ACCOUNT'
-  | 'CREDIT_CARD'
   | 'DATE'
   | 'SIREN'
   | 'SIRET'
   | 'CAPITAL'
-  | 'OTHER'
 
 // Entity labels array for iteration
 export const ENTITY_LABELS: EntityLabel[] = [
@@ -50,15 +46,11 @@ export const ENTITY_LABELS: EntityLabel[] = [
   'ADDRESS',
   'EMAIL',
   'PHONE',
-  'SSN',
   'IBAN',
-  'BANK_ACCOUNT',
-  'CREDIT_CARD',
   'DATE',
   'SIREN',
   'SIRET',
   'CAPITAL',
-  'OTHER',
 ]
 
 // Entity colors for visualization
@@ -68,15 +60,11 @@ export const ENTITY_COLORS: Record<EntityLabel, string> = {
   ADDRESS: '#10b981',      // emerald
   EMAIL: '#f59e0b',        // amber
   PHONE: '#06b6d4',        // cyan
-  SSN: '#ef4444',          // red
   IBAN: '#ec4899',         // pink
-  BANK_ACCOUNT: '#f97316', // orange
-  CREDIT_CARD: '#dc2626',  // red-600
   DATE: '#6366f1',         // indigo
   SIREN: '#14b8a6',        // teal
   SIRET: '#0ea5e9',        // sky
   CAPITAL: '#a855f7',      // purple
-  OTHER: '#64748b',        // slate
 }
 
 // A detected span of text

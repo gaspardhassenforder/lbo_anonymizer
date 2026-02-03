@@ -65,17 +65,11 @@ const EMAIL_PATTERN = /[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/g
 // French IBAN (FR + 2 check digits + 23 alphanumeric)
 const IBAN_PATTERN = /\bFR\s?[0-9]{2}(?:\s?[0-9A-Z]{4}){5}\s?[0-9A-Z]{3}\b/gi
 
-// Credit card with Luhn validation
-const CREDIT_CARD_PATTERN = /\b(?:\d{4}[\s-]?){3}\d{4}\b/g
-
 // French SIREN (9 digits)
 const SIREN_PATTERN = /\b\d{3}[\s]?\d{3}[\s]?\d{3}\b/g
 
 // French SIRET (14 digits = SIREN + NIC)
 const SIRET_PATTERN = /\b\d{3}[\s]?\d{3}[\s]?\d{3}[\s]?\d{5}\b/g
-
-// French Social Security Number (NIR) - 13 or 15 digits
-const SSN_PATTERN = /\b[12]\s?\d{2}\s?\d{2}\s?\d{2}\s?\d{3}\s?\d{3}(?:\s?\d{2})?\b/g
 
 // Capital amounts (euros)
 const CAPITAL_PATTERN = /\b\d{1,3}(?:[\s,.]?\d{3})*(?:[,.]\d{2})?\s*(?:€|euros?|EUR)\b/gi
@@ -87,33 +81,6 @@ const DATE_PATTERNS = [
   // Written dates in French
   /\b(0?[1-9]|[12][0-9]|3[01])\s+(janvier|février|mars|avril|mai|juin|juillet|août|septembre|octobre|novembre|décembre)\s+(19|20)\d{2}\b/gi,
 ]
-
-/**
- * Luhn algorithm to validate credit card numbers
- */
-function isValidLuhn(number: string): boolean {
-  const digits = number.replace(/\D/g, '')
-  if (digits.length < 13 || digits.length > 19) return false
-
-  let sum = 0
-  let isEven = false
-
-  for (let i = digits.length - 1; i >= 0; i--) {
-    let digit = parseInt(digits[i], 10)
-
-    if (isEven) {
-      digit *= 2
-      if (digit > 9) {
-        digit -= 9
-      }
-    }
-
-    sum += digit
-    isEven = !isEven
-  }
-
-  return sum % 10 === 0
-}
 
 /**
  * Validate French SIREN/SIRET using Luhn algorithm
@@ -196,12 +163,6 @@ export function detectWithPatterns(
     addMatch('IBAN', match, 0.95)
   }
 
-  // Credit card (with Luhn validation)
-  const ccRegex = new RegExp(CREDIT_CARD_PATTERN.source, 'g')
-  while ((match = ccRegex.exec(text)) !== null) {
-    addMatch('CREDIT_CARD', match, 0.9, isValidLuhn)
-  }
-
   // SIRET first (more specific, 14 digits)
   const siretRegex = new RegExp(SIRET_PATTERN.source, 'g')
   while ((match = siretRegex.exec(text)) !== null) {
@@ -224,12 +185,6 @@ export function detectWithPatterns(
         addMatch('SIREN', match, 0.85, isValidSiren)
       }
     }
-  }
-
-  // SSN (NIR)
-  const ssnRegex = new RegExp(SSN_PATTERN.source, 'g')
-  while ((match = ssnRegex.exec(text)) !== null) {
-    addMatch('SSN', match, 0.9)
   }
 
   // Capital amounts
