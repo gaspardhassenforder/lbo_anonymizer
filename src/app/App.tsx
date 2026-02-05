@@ -24,6 +24,7 @@ import { PaginatedPdfViewer } from '../components/PaginatedPdfViewer'
 import { Sidebar } from '../components/Sidebar'
 import { Toolbar } from '../components/Toolbar'
 import { EditorHelpDialog } from '../components/EditorHelpDialog'
+import { SelectTextHint } from '../components/SelectTextHint'
 
 export default function App() {
   const { t, i18n } = useTranslation()
@@ -35,6 +36,9 @@ export default function App() {
   const [loadingDocument, setLoadingDocument] = useState(false)
   const [processingFromLocationState, setProcessingFromLocationState] = useState(false)
   const [showEditorHelp, setShowEditorHelp] = useState(false)
+  const [showSelectHint, setShowSelectHint] = useState(
+    () => (typeof window !== 'undefined' ? !localStorage.getItem('lbo-anonymizer-select-hint-dismissed') : true)
+  )
   const hasTriedRestore = useRef(false)
   const hasTriedLoadDocument = useRef(false)
   const hasProcessedLocationState = useRef(false)
@@ -970,37 +974,47 @@ export default function App() {
 
       {/* Main content */}
       <div className="flex-1 flex overflow-hidden">
-        {/* PDF viewer */}
-        <div className="flex-1 overflow-hidden">
-          {pdfDocument && (
-            <PaginatedPdfViewer
-              document={pdfDocument}
-              pages={pages}
-              spans={filteredSpans}
-              regions={regions}
-              zoom={zoom}
-              totalPageCount={totalPageCount}
-              pageProcessingStatus={pageProcessingStatus}
-              currentPage={currentPage}
-              selectedSpanId={selectedSpanId}
-              selectedRegionId={selectedRegionId}
-              hasMultipleDocuments={savedDocuments.length > 1}
-              onPageChange={setCurrentPage}
-              onSpanClick={handleSpanClick}
-              onRegionClick={handleRegionClick}
-              onSpanRemove={handleSpanRemove}
-              onSpanRemoveAllByText={handleRemoveAllByText}
-              onSpanRemoveAllDocuments={handleRemoveAllDocuments}
-              onSpanLabelChange={handleSpanLabelChange}
-              onSpanLabelChangeAll={handleSpanLabelChangeAll}
-              onSpanLabelChangeAllDocuments={handleSpanLabelChangeAllDocuments}
-              onSpanAdd={handleSpanAdd}
-              onSpanAddAll={handleSpanAddAll}
-              onSpanAddAllDocuments={handleSpanAddAllDocuments}
-              countTextMatches={countTextMatches}
-              getInstanceCount={getInstanceCount}
+        {/* PDF viewer column: hint banner + viewer */}
+        <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
+          {showSelectHint && pdfDocument && (
+            <SelectTextHint
+              onDismiss={() => {
+                setShowSelectHint(false)
+                localStorage.setItem('lbo-anonymizer-select-hint-dismissed', '1')
+              }}
             />
           )}
+          <div className="flex-1 overflow-hidden">
+            {pdfDocument && (
+              <PaginatedPdfViewer
+                document={pdfDocument}
+                pages={pages}
+                spans={filteredSpans}
+                regions={regions}
+                zoom={zoom}
+                totalPageCount={totalPageCount}
+                pageProcessingStatus={pageProcessingStatus}
+                currentPage={currentPage}
+                selectedSpanId={selectedSpanId}
+                selectedRegionId={selectedRegionId}
+                hasMultipleDocuments={savedDocuments.length > 1}
+                onPageChange={setCurrentPage}
+                onSpanClick={handleSpanClick}
+                onRegionClick={handleRegionClick}
+                onSpanRemove={handleSpanRemove}
+                onSpanRemoveAllByText={handleRemoveAllByText}
+                onSpanRemoveAllDocuments={handleRemoveAllDocuments}
+                onSpanLabelChange={handleSpanLabelChange}
+                onSpanLabelChangeAll={handleSpanLabelChangeAll}
+                onSpanLabelChangeAllDocuments={handleSpanLabelChangeAllDocuments}
+                onSpanAdd={handleSpanAdd}
+                onSpanAddAll={handleSpanAddAll}
+                onSpanAddAllDocuments={handleSpanAddAllDocuments}
+                countTextMatches={countTextMatches}
+                getInstanceCount={getInstanceCount}
+              />
+            )}
+          </div>
         </div>
 
         {/* Sidebar */}

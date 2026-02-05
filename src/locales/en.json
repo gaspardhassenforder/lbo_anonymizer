@@ -159,7 +159,9 @@
     "noFile": "No file"
   },
   "editor": {
-    "unsavedChangesWarning": "You have unsaved changes. Are you sure you want to leave?"
+    "unsavedChangesWarning": "You have unsaved changes. Are you sure you want to leave?",
+    "selectTextHint": "To select text: click a word to start, then click another word to end. Press Esc to cancel.",
+    "dismiss": "Dismiss"
   },
   "editorHelp": {
     "title": "How the editor works",
