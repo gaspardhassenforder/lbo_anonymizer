@@ -32,6 +32,19 @@ function normalizeText(text: string): string {
   return text.trim().toLowerCase().replace(/\s+/g, ' ')
 }
 
+// Format page indices as p2,4,5,7 (1-based), max 5 then "..."
+function formatPageList(spans: DetectedSpan[], maxPages = 5): string {
+  const pages = [...new Set(spans.map((s) => s.pageIndex + 1))].sort((a, b) => a - b)
+  if (pages.length <= maxPages) return `p${pages.join(',')}`
+  return `p${pages.slice(0, maxPages).join(',')}...`
+}
+
+interface SpanGroup {
+  normalizedText: string
+  displayText: string
+  spans: DetectedSpan[] // sorted by pageIndex, charStart
+}
+
 export function Sidebar({
   spans,
   regions,
@@ -62,7 +75,19 @@ export function Sidebar({
   const [labelPickerRegionId, setLabelPickerRegionId] = useState<string | null>(null)
   const [labelChangeConfirmSpan, setLabelChangeConfirmSpan] = useState<DetectedSpan | null>(null)
   const [labelChangeConfirmLabel, setLabelChangeConfirmLabel] = useState<EntityLabel | null>(null)
+  const [collapsedLabels, setCollapsedLabels] = useState<Set<EntityLabel>>(
+    () => new Set(ENTITY_LABELS)
+  )
   const labelPickerRef = useRef<HTMLDivElement>(null)
+
+  const toggleLabelCollapsed = (label: EntityLabel) => {
+    setCollapsedLabels((prev) => {
+      const next = new Set(prev)
+      if (next.has(label)) next.delete(label)
+      else next.add(label)
+      return next
+    })
+  }
 
   // Close label picker on click outside
   useEffect(() => {
@@ -80,27 +105,38 @@ export function Sidebar({
     }
   }, [labelPickerSpanId, labelPickerRegionId])
 
-  // Group spans by label
-  const groupedSpans = useMemo(() => {
-    const groups = new Map<EntityLabel, DetectedSpan[]>()
-
-    for (const label of ENTITY_LABELS) {
-      groups.set(label, [])
-    }
+  // Group spans by label, then by normalized text (one row per unique string)
+  const groupedByLabelAndText = useMemo(() => {
+    const byLabel = new Map<EntityLabel, Map<string, DetectedSpan[]>>()
 
     const filteredSpans = spans.filter((s) => s.confidence >= confidenceThreshold)
     for (const span of filteredSpans) {
-      groups.get(span.label)?.push(span)
+      const norm = normalizeText(span.text)
+      if (!byLabel.has(span.label)) byLabel.set(span.label, new Map())
+      const textMap = byLabel.get(span.label)!
+      if (!textMap.has(norm)) textMap.set(norm, [])
+      textMap.get(norm)!.push(span)
     }
 
-    // Remove empty groups
-    for (const [label, labelSpans] of groups) {
-      if (labelSpans.length === 0) {
-        groups.delete(label)
+    const result = new Map<EntityLabel, SpanGroup[]>()
+    for (const label of ENTITY_LABELS) {
+      const textMap = byLabel.get(label)
+      if (!textMap || textMap.size === 0) continue
+      const groups: SpanGroup[] = []
+      for (const [normalizedText, labelSpans] of textMap) {
+        const sorted = labelSpans.slice().sort((a, b) => {
+          if (a.pageIndex !== b.pageIndex) return a.pageIndex - b.pageIndex
+          return a.charStart - b.charStart
+        })
+        groups.push({
+          normalizedText,
+          displayText: sorted[0].text,
+          spans: sorted,
+        })
       }
+      result.set(label, groups)
     }
-
-    return groups
+    return result
   }, [spans, confidenceThreshold])
 
   const signatureRegions = useMemo(() => {
@@ -110,21 +146,36 @@ export function Sidebar({
       .sort((a, b) => a.pageIndex - b.pageIndex)
   }, [regions])
 
-  // Count unique entities
+  // Count unique entity strings per label
   const entityCounts = useMemo(() => {
     const counts: Partial<Record<EntityLabel, number>> = {}
-    for (const [label, labelSpans] of groupedSpans) {
-      counts[label] = labelSpans.length
+    for (const [label, groups] of groupedByLabelAndText) {
+      counts[label] = groups.length
     }
     return counts
-  }, [groupedSpans])
+  }, [groupedByLabelAndText])
 
-  // Total entity count
+  // Total entity count (total span occurrences)
   const totalCount = useMemo(() => {
     return spans.filter((s) => s.confidence >= confidenceThreshold).length
   }, [spans, confidenceThreshold])
 
-  const hasAnyItems = groupedSpans.size > 0 || signatureRegions.length > 0
+  const hasAnyItems = groupedByLabelAndText.size > 0 || signatureRegions.length > 0
+
+  // Get representative span for a group (selected-in-group or first)
+  const getRepresentativeSpan = (group: SpanGroup): DetectedSpan =>
+    group.spans.find((s) => s.id === selectedSpanId) ?? group.spans[0]
+
+  // Handle row click: cycle through occurrences
+  const handleGroupRowClick = (group: SpanGroup) => {
+    const idx = selectedSpanId
+      ? group.spans.findIndex((s) => s.id === selectedSpanId)
+      : -1
+    const nextIdx = idx < 0 ? 0 : (idx + 1) % group.spans.length
+    const nextSpan = group.spans[nextIdx]
+    onSpanSelect(nextSpan.id)
+    onPageNavigate(nextSpan.pageIndex)
+  }
 
   const handleRemoveClick = (span: DetectedSpan) => {
     const instanceCount = getInstanceCount(normalizeText(span.text))
@@ -340,12 +391,28 @@ export function Sidebar({
                 </div>
               </div>
             )}
-          {Array.from(groupedSpans.entries()).map(([label, labelSpans]) => (
+          {Array.from(groupedByLabelAndText.entries()).map(([label, groups]) => {
+            const isCollapsed = collapsedLabels.has(label)
+            return (
             <div key={label} className="border-b border-slate-100">
-              {/* Label header */}
-              <div className="px-5 py-3 bg-slate-50 flex items-center gap-3 sticky top-0 z-10">
+              {/* Label header with collapse toggle */}
+              <button
+                type="button"
+                className="w-full px-5 py-3 bg-slate-50 flex items-center gap-3 sticky top-0 z-10 hover:bg-slate-100 transition-colors text-left"
+                onClick={() => toggleLabelCollapsed(label)}
+              >
+                <svg
+                  className="w-4 h-4 text-slate-500 shrink-0 transition-transform"
+                  style={{ transform: isCollapsed ? 'rotate(-90deg)' : undefined }}
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                  strokeWidth={2}
+                >
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+                </svg>
                 <div
-                  className="w-2.5 h-2.5 rounded-full"
+                  className="w-2.5 h-2.5 rounded-full shrink-0"
                   style={{
                     backgroundColor: ENTITY_COLORS[label],
                   }}
@@ -356,55 +423,51 @@ export function Sidebar({
                 <span className="text-xs text-slate-500">
                   {entityCounts[label]}
                 </span>
-              </div>
+              </button>
 
-              {/* Spans in this group */}
+              {/* One row per unique text (group) */}
+              {!isCollapsed && (
               <div>
-                {labelSpans.map((span) => {
-                  const instanceCount = getInstanceCount(normalizeText(span.text))
+                {groups.map((group) => {
+                  const rep = getRepresentativeSpan(group)
+                  const isRowSelected = group.spans.some((s) => s.id === selectedSpanId)
                   return (
                     <div
-                      key={span.id}
+                      key={group.normalizedText}
                       className={`
                         px-5 py-3 cursor-pointer transition-all duration-150
                         border-l-2 hover:bg-slate-50
-                        ${span.id === selectedSpanId
-                          ? 'bg-slate-50'
-                          : ''
-                        }
+                        ${isRowSelected ? 'bg-slate-50' : ''}
                       `}
                       style={{
-                        borderLeftColor: span.id === selectedSpanId ? ENTITY_COLORS[label] : 'transparent',
+                        borderLeftColor: isRowSelected ? ENTITY_COLORS[label] : 'transparent',
                       }}
-                      onClick={() => {
-                        onSpanSelect(span.id)
-                        onPageNavigate(span.pageIndex)
-                      }}
+                      onClick={() => handleGroupRowClick(group)}
                     >
                       <div className="flex items-start justify-between gap-3">
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-2">
-                            <p className="text-sm text-slate-800 truncate font-medium" title={span.text}>
-                              {span.text}
+                            <p className="text-sm text-slate-800 truncate font-medium" title={group.displayText}>
+                              {group.displayText}
                             </p>
-                            {instanceCount > 1 && (
-                              <span className="px-1.5 py-0.5 rounded bg-slate-100 text-xs text-slate-500">
-                                x{instanceCount}
+                            {group.spans.length > 1 && (
+                              <span className="px-1.5 py-0.5 rounded bg-slate-100 text-xs text-slate-500 shrink-0">
+                                x{group.spans.length}
                               </span>
                             )}
                           </div>
-                          <div className="flex items-center gap-2 mt-1">
+                          <div className="flex items-center gap-2 mt-1 flex-wrap">
                             <span className="text-xs text-slate-500">
-                              {t('common.page')}{span.pageIndex + 1}
+                              {formatPageList(group.spans)}
                             </span>
                             <span className="text-slate-300">·</span>
                             <span className={`text-xs ${
-                              span.confidence >= 0.8 ? 'text-success-600' :
-                              span.confidence >= 0.5 ? 'text-amber-600' : 'text-danger-600'
+                              rep.confidence >= 0.8 ? 'text-success-600' :
+                              rep.confidence >= 0.5 ? 'text-amber-600' : 'text-danger-600'
                             }`}>
-                              {Math.round(span.confidence * 100)}%
+                              {Math.round(rep.confidence * 100)}%
                             </span>
-                            {span.source === 'user' && (
+                            {rep.source === 'user' && (
                               <>
                                 <span className="text-slate-300">·</span>
                                 <span className="text-xs text-violet-600">{t('source.user')}</span>
@@ -414,24 +477,24 @@ export function Sidebar({
                         </div>
                         <div className="flex items-center gap-0.5" onClick={(e) => e.stopPropagation()}>
                           {onSpanLabelChange && (
-                            <div className="relative" ref={labelPickerSpanId === span.id ? labelPickerRef : undefined}>
+                            <div className="relative" ref={labelPickerSpanId === rep.id ? labelPickerRef : undefined}>
                               <button
                                 className="p-1.5 rounded-md text-slate-400 hover:text-primary-600 hover:bg-primary-50 transition-colors"
-                                onClick={() => setLabelPickerSpanId(labelPickerSpanId === span.id ? null : span.id)}
+                                onClick={() => setLabelPickerSpanId(labelPickerSpanId === rep.id ? null : rep.id)}
                                 title={t('popover.changeLabel')}
                               >
                                 <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                                   <path strokeLinecap="round" strokeLinejoin="round" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
                                 </svg>
                               </button>
-                              {labelPickerSpanId === span.id && (
+                              {labelPickerSpanId === rep.id && (
                                 <div className="absolute right-0 top-full mt-1 z-50 py-1 bg-white border border-slate-200 rounded-lg shadow-lg min-w-[140px] max-h-48 overflow-y-auto">
                                   {ENTITY_LABELS.map((entityLabel) => (
                                     <button
                                       key={entityLabel}
                                       className="w-full px-3 py-2 text-left text-sm flex items-center gap-2 hover:bg-slate-50 rounded-none first:rounded-t-lg last:rounded-b-lg"
-                                      style={{ color: span.label === entityLabel ? 'var(--color-primary-600)' : undefined }}
-                                      onClick={() => handleLabelClick(span, entityLabel)}
+                                      style={{ color: rep.label === entityLabel ? 'var(--color-primary-600)' : undefined }}
+                                      onClick={() => handleLabelClick(rep, entityLabel)}
                                     >
                                       <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: ENTITY_COLORS[entityLabel] }} />
                                       {t(`entities.${entityLabel}`)}
@@ -443,7 +506,7 @@ export function Sidebar({
                           )}
                           <button
                             className="p-1.5 rounded-md text-slate-400 hover:text-danger-500 hover:bg-danger-50 transition-colors"
-                            onClick={() => handleRemoveClick(span)}
+                            onClick={() => handleRemoveClick(rep)}
                             title={t('popover.remove')}
                           >
                             <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -456,8 +519,10 @@ export function Sidebar({
                   )
                 })}
               </div>
+              )}
             </div>
-          ))}
+            )
+          })}
           </>
         )}
       </div>

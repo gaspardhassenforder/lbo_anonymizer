@@ -68,8 +68,8 @@ body {
 }
 
 .entity-highlight.selected {
-  opacity: 0.5;
-  box-shadow: 0 0 0 2px currentColor;
+  opacity: 0.65;
+  box-shadow: 0 0 0 3px currentColor;
 }
 
 /* Entity type colors */

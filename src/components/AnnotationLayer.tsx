@@ -56,7 +56,7 @@ export function AnnotationLayer({
                 className={`
                   entity-highlight
                   entity-${span.label}
-                  ${isSelected ? 'selected ring-2 ring-white' : ''}
+                  ${isSelected ? 'selected ring-[3px] ring-white' : ''}
                 `}
                 style={{
                   left: bbox.x,
