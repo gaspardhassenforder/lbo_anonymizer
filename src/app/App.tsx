@@ -2,7 +2,7 @@ import { useState, useCallback, useEffect, useRef } from 'react'
 import { useNavigate, useSearchParams, useBlocker, useLocation } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import type { PDFDocumentProxy } from 'pdfjs-dist'
-import type { DetectedSpan, EntityLabel } from '../types'
+import type { DetectedSpan, EntityLabel, RedactionRegion } from '../types'
 import { normalizeEntityLabel } from '../types'
 import { useStore, getInstanceCount, normalizeText } from '../state/store'
 import { loadPdf } from '../pdf/pdfLoader'
@@ -48,7 +48,9 @@ export default function App() {
   const file = useStore((state) => state.file)
   const pages = useStore((state) => state.pages)
   const spans = useStore((state) => state.spans)
+  const regions = useStore((state) => state.regions)
   const selectedSpanId = useStore((state) => state.selectedSpanId)
+  const selectedRegionId = useStore((state) => state.selectedRegionId)
   const confidenceThreshold = useStore((state) => state.confidenceThreshold)
   const zoom = useStore((state) => state.zoom)
   const processing = useStore((state) => state.processing)
@@ -66,14 +68,19 @@ export default function App() {
   const setFile = useStore((state) => state.setFile)
   const setPages = useStore((state) => state.setPages)
   const setSpans = useStore((state) => state.setSpans)
+  const setRegions = useStore((state) => state.setRegions)
   const addSpan = useStore((state) => state.addSpan)
   const addSpans = useStore((state) => state.addSpans)
   const addPage = useStore((state) => state.addPage)
   const addPageSpans = useStore((state) => state.addPageSpans)
+  const addPageRegions = useStore((state) => state.addPageRegions)
   const removeSpan = useStore((state) => state.removeSpan)
+  const removeRegion = useStore((state) => state.removeRegion)
   const removeSpansByNormalizedText = useStore((state) => state.removeSpansByNormalizedText)
   const updateSpanLabel = useStore((state) => state.updateSpanLabel)
+  const updateRegionLabel = useStore((state) => state.updateRegionLabel)
   const setSelectedSpan = useStore((state) => state.setSelectedSpan)
+  const setSelectedRegion = useStore((state) => state.setSelectedRegion)
   const setConfidenceThreshold = useStore((state) => state.setConfidenceThreshold)
   const setProcessing = useStore((state) => state.setProcessing)
   const setCurrentPage = useStore((state) => state.setCurrentPage)
@@ -263,6 +270,7 @@ export default function App() {
         // Parse pages/entities from JSON
         const storedPages = JSON.parse(savedData.pagesJson || '[]') as typeof pages
         const entities = JSON.parse(savedData.entitiesJson || '[]') as DetectedSpan[]
+        const storedRegions = JSON.parse(savedData.regionsJson || '[]') as RedactionRegion[]
 
         // Create a File object for the store
         const originalName = savedMeta?.originalFilename ?? 'document.pdf'
@@ -288,6 +296,11 @@ export default function App() {
         setSpans(
           Array.isArray(entities)
             ? entities.map((s) => ({ ...s, label: normalizeEntityLabel(s.label) }))
+            : []
+        )
+        setRegions(
+          Array.isArray(storedRegions)
+            ? storedRegions.map((r) => ({ ...r, label: normalizeEntityLabel(r.label) }))
             : []
         )
 
@@ -400,6 +413,9 @@ export default function App() {
           // Add spans for this page
           addPageSpans(result.spans)
 
+          // Add redaction regions (e.g., signature widgets) for this page
+          addPageRegions(result.regions)
+
           // Mark page as ready
           setPageProcessingStatus(pageIndex, 'ready')
         },
@@ -471,15 +487,29 @@ export default function App() {
     setSelectedSpan(span.id)
   }, [setSelectedSpan])
 
+  const handleRegionClick = useCallback((region: RedactionRegion) => {
+    setSelectedRegion(region.id)
+  }, [setSelectedRegion])
+
   const handleSpanRemove = useCallback((spanId: string) => {
     removeSpan(spanId)
     setDirty(true)
   }, [removeSpan, setDirty])
 
+  const handleRegionRemove = useCallback((regionId: string) => {
+    removeRegion(regionId)
+    setDirty(true)
+  }, [removeRegion, setDirty])
+
   const handleSpanLabelChange = useCallback((spanId: string, label: EntityLabel) => {
     updateSpanLabel(spanId, label)
     setDirty(true)
   }, [updateSpanLabel, setDirty])
+
+  const handleRegionLabelChange = useCallback((regionId: string, label: EntityLabel) => {
+    updateRegionLabel(regionId, label)
+    setDirty(true)
+  }, [updateRegionLabel, setDirty])
 
   // Change label for all instances of a normalized text
   const updateSpanLabelByNormalizedText = useStore((state) => state.updateSpanLabelByNormalizedText)
@@ -822,6 +852,7 @@ export default function App() {
     try {
       // Prepare entities JSON (store all spans, including user edits)
       const entitiesJson = JSON.stringify(spans)
+      const regionsJson = JSON.stringify(regions)
 
       // Prepare pages JSON (store PageModels so we don't need to re-run OCR)
       const pagesJson = JSON.stringify(pages)
@@ -844,6 +875,7 @@ export default function App() {
         pdfData: pdfArrayBuffer,
         pagesJson,
         entitiesJson,
+        regionsJson,
       })
 
       // Persist/update doc metadata to IndexedDB + store
@@ -945,14 +977,17 @@ export default function App() {
               document={pdfDocument}
               pages={pages}
               spans={filteredSpans}
+              regions={regions}
               zoom={zoom}
               totalPageCount={totalPageCount}
               pageProcessingStatus={pageProcessingStatus}
               currentPage={currentPage}
               selectedSpanId={selectedSpanId}
+              selectedRegionId={selectedRegionId}
               hasMultipleDocuments={savedDocuments.length > 1}
               onPageChange={setCurrentPage}
               onSpanClick={handleSpanClick}
+              onRegionClick={handleRegionClick}
               onSpanRemove={handleSpanRemove}
               onSpanRemoveAllByText={handleRemoveAllByText}
               onSpanRemoveAllDocuments={handleRemoveAllDocuments}
@@ -971,17 +1006,22 @@ export default function App() {
         {/* Sidebar */}
         <Sidebar
           spans={spans}
+          regions={regions}
           selectedSpanId={selectedSpanId}
+          selectedRegionId={selectedRegionId}
           confidenceThreshold={confidenceThreshold}
           onSpanSelect={setSelectedSpan}
+          onRegionSelect={setSelectedRegion}
           onSpanRemove={handleSpanRemove}
           onSpanRemoveAllByText={handleRemoveAllByText}
+          onRegionRemove={handleRegionRemove}
           onPageNavigate={setCurrentPage}
           onConfidenceChange={setConfidenceThreshold}
           getInstanceCount={getInstanceCount}
           hasMultipleDocuments={savedDocuments.length > 1}
           onSpanLabelChange={handleSpanLabelChange}
           onSpanLabelChangeAll={handleSpanLabelChangeAll}
+          onRegionLabelChange={handleRegionLabelChange}
           onSpanRemoveAllDocuments={handleRemoveAllDocuments}
           onSpanLabelChangeAllDocuments={handleSpanLabelChangeAllDocuments}
         />

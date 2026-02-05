@@ -1,6 +1,6 @@
 import { PDFDocument, rgb, StandardFonts } from 'pdf-lib'
 import type { PDFDocumentProxy } from 'pdfjs-dist'
-import type { PageModel, DetectedSpan, TagEntry } from '../types'
+import type { PageModel, DetectedSpan, TagEntry, RedactionRegion } from '../types'
 import { getPdfPage } from '../pdf/pdfLoader'
 import { renderPageToImage } from '../pdf/render'
 import { getTagForSpan } from '../tagging/tagger'
@@ -30,7 +30,8 @@ export async function exportHybridPdf(
   pages: PageModel[],
   spans: DetectedSpan[],
   tagMap: Map<string, TagEntry>,
-  onProgress?: (progress: ExportProgress) => void
+  onProgress?: (progress: ExportProgress) => void,
+  regions: RedactionRegion[] = []
 ): Promise<Uint8Array> {
   // Create new PDF document
   const newPdf = await PDFDocument.create()
@@ -62,6 +63,7 @@ export async function exportHybridPdf(
 
     // Get page spans
     const pageSpans = spans.filter((s) => s.pageIndex === pageModel.pageIndex)
+    const pageRegions = regions.filter((r) => r.pageIndex === pageModel.pageIndex)
 
     // Build a set of token IDs that are part of redacted spans
     const redactedTokenIds = new Set<string>()
@@ -87,6 +89,19 @@ export async function exportHybridPdf(
           opacity: 1,
         })
       }
+    }
+
+    // Draw black redaction rectangles over detected regions (e.g., signature widgets)
+    for (const region of pageRegions) {
+      const bbox = region.bbox
+      newPage.drawRectangle({
+        x: bbox.x,
+        y: bbox.y,
+        width: bbox.width,
+        height: bbox.height,
+        color: rgb(0, 0, 0),
+        opacity: 1,
+      })
     }
 
     // Add positioned text layer for selectability/searchability
@@ -176,6 +191,7 @@ export async function exportAndDownloadPdf(
   pages: PageModel[],
   spans: DetectedSpan[],
   tagMap: Map<string, TagEntry>,
+  regions: RedactionRegion[] = [],
   filename: string,
   onProgress?: (progress: ExportProgress) => void
 ): Promise<void> {
@@ -184,7 +200,8 @@ export async function exportAndDownloadPdf(
     pages,
     spans,
     tagMap,
-    onProgress
+    onProgress,
+    regions
   )
   downloadPdf(pdfBytes, filename)
 }
@@ -197,6 +214,7 @@ export async function exportPdfAsBlob(
   pages: PageModel[],
   spans: DetectedSpan[],
   tagMap: Map<string, TagEntry>,
+  regions: RedactionRegion[] = [],
   onProgress?: (progress: ExportProgress) => void
 ): Promise<Blob> {
   const pdfBytes = await exportHybridPdf(
@@ -204,7 +222,8 @@ export async function exportPdfAsBlob(
     pages,
     spans,
     tagMap,
-    onProgress
+    onProgress,
+    regions
   )
   return new Blob([new Uint8Array(pdfBytes)], { type: 'application/pdf' })
 }

@@ -20,15 +20,17 @@ export default function OCRView() {
     (status) => status === 'ready'
   ).length
 
-  if (!file) {
+  // OCRView is a debugging page: prefer showing OCR when we have page data,
+  // even if `file` is not available (e.g. after a full page reload).
+  if (pages.length === 0) {
     return (
       <div className="min-h-screen bg-slate-50 flex flex-col items-center justify-center p-8">
         <div className="text-center">
           <h1 className="text-2xl font-bold text-slate-800 mb-4">OCR Text View</h1>
           <p className="text-slate-500 mb-6">
-            No document uploaded. Please upload a PDF on the{' '}
-            <Link to="/" className="text-primary-600 underline hover:text-primary-700">
-              main page
+            No OCR data in memory. Please open a document in the{' '}
+            <Link to="/editor" className="text-primary-600 underline hover:text-primary-700">
+              editor
             </Link>{' '}
             first.
           </p>
@@ -72,12 +74,12 @@ export default function OCRView() {
           <div className="grid grid-cols-2 gap-4 text-sm">
             <div>
               <span className="text-slate-500">Filename:</span>
-              <span className="ml-2 font-medium text-slate-700">{file.name}</span>
+              <span className="ml-2 font-medium text-slate-700">{file?.name ?? '(unknown)'}</span>
             </div>
             <div>
               <span className="text-slate-500">File Size:</span>
               <span className="ml-2 font-medium text-slate-700">
-                {(file.size / 1024).toFixed(1)} KB
+                {file ? `${(file.size / 1024).toFixed(1)} KB` : '(unknown)'}
               </span>
             </div>
             <div>

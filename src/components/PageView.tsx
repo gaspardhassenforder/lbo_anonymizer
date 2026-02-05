@@ -1,8 +1,9 @@
 import { useEffect, useRef, useCallback, useState } from 'react'
 import type { PDFPageProxy } from 'pdfjs-dist'
-import type { PageModel, DetectedSpan, EntityLabel } from '../types'
+import type { PageModel, DetectedSpan, EntityLabel, RedactionRegion } from '../types'
 import { cleanupCanvas } from '../pdf/render'
 import { AnnotationLayer } from './AnnotationLayer'
+import { RegionLayer } from './RegionLayer'
 import { TextLayer } from './TextLayer'
 import { TagPopover, LabelPicker } from './TagPopover'
 import { normalizeText } from '../state/store'
@@ -12,10 +13,13 @@ interface PageViewProps {
   page: PDFPageProxy
   pageModel: PageModel
   spans: DetectedSpan[]
+  regions: RedactionRegion[]
   scale: number
   selectedSpanId: string | null
+  selectedRegionId: string | null
   hasMultipleDocuments?: boolean
   onSpanClick: (span: DetectedSpan) => void
+  onRegionClick: (region: RedactionRegion) => void
   onSpanRemove: (spanId: string) => void
   onSpanRemoveAllByText: (normalizedText: string) => void
   onSpanRemoveAllDocuments?: (normalizedText: string) => void
@@ -31,10 +35,13 @@ export function PageView({
   page,
   pageModel,
   spans,
+  regions,
   scale,
   selectedSpanId,
+  selectedRegionId,
   hasMultipleDocuments = false,
   onSpanClick,
+  onRegionClick,
   onSpanRemove,
   onSpanRemoveAllByText,
   onSpanRemoveAllDocuments,
@@ -141,6 +148,10 @@ export function PageView({
     })
   }, [onSpanClick])
 
+  const handleRegionClick = useCallback((region: RedactionRegion) => {
+    onRegionClick(region)
+  }, [onRegionClick])
+
   // Handle text selection for adding new span
   const handleSelectionCreate = useCallback((charStart: number, charEnd: number, text: string, anchorRect: DOMRect) => {
     setLabelPicker({
@@ -164,6 +175,7 @@ export function PageView({
 
   // Filter spans for this page
   const pageSpans = spans.filter((s) => s.pageIndex === pageModel.pageIndex)
+  const pageRegions = regions.filter((r) => r.pageIndex === pageModel.pageIndex)
 
   return (
     <div
@@ -196,13 +208,22 @@ export function PageView({
 
       {/* Annotation layer for highlights (z-index: 2) */}
       {isRendered && (
-        <AnnotationLayer
-          spans={pageSpans}
-          pageHeight={pageModel.height}
-          scale={scale}
-          selectedSpanId={selectedSpanId}
-          onSpanClick={handleSpanClick}
-        />
+        <>
+          <RegionLayer
+            regions={pageRegions}
+            pageHeight={pageModel.height}
+            scale={scale}
+            selectedRegionId={selectedRegionId}
+            onRegionClick={(region) => handleRegionClick(region)}
+          />
+          <AnnotationLayer
+            spans={pageSpans}
+            pageHeight={pageModel.height}
+            scale={scale}
+            selectedSpanId={selectedSpanId}
+            onSpanClick={handleSpanClick}
+          />
+        </>
       )}
 
       {/* Page number */}

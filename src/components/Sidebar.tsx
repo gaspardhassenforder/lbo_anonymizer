@@ -1,17 +1,21 @@
 import { useMemo, useState, useRef, useEffect } from 'react'
 import { useTranslation } from 'react-i18next'
-import type { DetectedSpan, EntityLabel } from '../types'
+import type { DetectedSpan, EntityLabel, RedactionRegion } from '../types'
 import { ENTITY_COLORS, ENTITY_LABELS } from '../types'
 import { ConfirmDialog } from './ConfirmDialog'
 import { ScopeSelectionDialog, ScopeOption } from './ScopeSelectionDialog'
 
 interface SidebarProps {
   spans: DetectedSpan[]
+  regions: RedactionRegion[]
   selectedSpanId: string | null
+  selectedRegionId: string | null
   confidenceThreshold: number
   onSpanSelect: (spanId: string | null) => void
+  onRegionSelect: (regionId: string | null) => void
   onSpanRemove: (spanId: string) => void
   onSpanRemoveAllByText: (normalizedText: string) => void
+  onRegionRemove: (regionId: string) => void
   onPageNavigate: (pageIndex: number) => void
   onConfidenceChange: (threshold: number) => void
   getInstanceCount: (normalizedText: string) => number
@@ -20,6 +24,7 @@ interface SidebarProps {
   onSpanLabelChangeAll?: (normalizedText: string, label: EntityLabel) => void
   onSpanRemoveAllDocuments?: (normalizedText: string) => void
   onSpanLabelChangeAllDocuments?: (normalizedText: string, label: EntityLabel) => void
+  onRegionLabelChange?: (regionId: string, label: EntityLabel) => void
 }
 
 // Normalize text for consistent comparison
@@ -29,11 +34,15 @@ function normalizeText(text: string): string {
 
 export function Sidebar({
   spans,
+  regions,
   selectedSpanId,
+  selectedRegionId,
   confidenceThreshold,
   onSpanSelect,
+  onRegionSelect,
   onSpanRemove,
   onSpanRemoveAllByText,
+  onRegionRemove,
   onPageNavigate,
   onConfidenceChange,
   getInstanceCount,
@@ -42,6 +51,7 @@ export function Sidebar({
   onSpanLabelChangeAll,
   onSpanRemoveAllDocuments,
   onSpanLabelChangeAllDocuments,
+  onRegionLabelChange,
 }: SidebarProps) {
   const { t } = useTranslation()
   const [removeConfirmSpan, setRemoveConfirmSpan] = useState<DetectedSpan | null>(null)
@@ -49,16 +59,18 @@ export function Sidebar({
   const [labelScopeSpan, setLabelScopeSpan] = useState<DetectedSpan | null>(null)
   const [labelScopeLabel, setLabelScopeLabel] = useState<EntityLabel | null>(null)
   const [labelPickerSpanId, setLabelPickerSpanId] = useState<string | null>(null)
+  const [labelPickerRegionId, setLabelPickerRegionId] = useState<string | null>(null)
   const [labelChangeConfirmSpan, setLabelChangeConfirmSpan] = useState<DetectedSpan | null>(null)
   const [labelChangeConfirmLabel, setLabelChangeConfirmLabel] = useState<EntityLabel | null>(null)
   const labelPickerRef = useRef<HTMLDivElement>(null)
 
   // Close label picker on click outside
   useEffect(() => {
-    if (!labelPickerSpanId) return
+    if (!labelPickerSpanId && !labelPickerRegionId) return
     const handleClickOutside = (e: MouseEvent) => {
       if (labelPickerRef.current && !labelPickerRef.current.contains(e.target as Node)) {
         setLabelPickerSpanId(null)
+        setLabelPickerRegionId(null)
       }
     }
     const id = setTimeout(() => document.addEventListener('mousedown', handleClickOutside), 0)
@@ -66,7 +78,7 @@ export function Sidebar({
       clearTimeout(id)
       document.removeEventListener('mousedown', handleClickOutside)
     }
-  }, [labelPickerSpanId])
+  }, [labelPickerSpanId, labelPickerRegionId])
 
   // Group spans by label
   const groupedSpans = useMemo(() => {
@@ -91,6 +103,13 @@ export function Sidebar({
     return groups
   }, [spans, confidenceThreshold])
 
+  const signatureRegions = useMemo(() => {
+    return regions
+      .filter((r) => r.kind === 'signature')
+      .slice()
+      .sort((a, b) => a.pageIndex - b.pageIndex)
+  }, [regions])
+
   // Count unique entities
   const entityCounts = useMemo(() => {
     const counts: Partial<Record<EntityLabel, number>> = {}
@@ -104,6 +123,8 @@ export function Sidebar({
   const totalCount = useMemo(() => {
     return spans.filter((s) => s.confidence >= confidenceThreshold).length
   }, [spans, confidenceThreshold])
+
+  const hasAnyItems = groupedSpans.size > 0 || signatureRegions.length > 0
 
   const handleRemoveClick = (span: DetectedSpan) => {
     const instanceCount = getInstanceCount(normalizeText(span.text))
@@ -209,7 +230,7 @@ export function Sidebar({
 
       {/* Entity list */}
       <div className="flex-1 overflow-y-auto">
-        {groupedSpans.size === 0 ? (
+        {!hasAnyItems ? (
           <div className="p-8 text-center">
             <div className="w-12 h-12 mx-auto mb-4 rounded-xl bg-slate-100 flex items-center justify-center">
               <svg className="w-6 h-6 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -220,7 +241,106 @@ export function Sidebar({
             <p className="text-slate-400 text-xs mt-1">{t('sidebar.noEntitiesHint')}</p>
           </div>
         ) : (
-          Array.from(groupedSpans.entries()).map(([label, labelSpans]) => (
+          <>
+            {/* Signature regions (PDF annotation widgets) */}
+            {signatureRegions.length > 0 && (
+              <div className="border-b border-slate-100">
+                <div className="px-5 py-3 bg-slate-50 flex items-center gap-3 sticky top-0 z-10">
+                  <div
+                    className="w-2.5 h-2.5 rounded-full"
+                    style={{ backgroundColor: ENTITY_COLORS.IDENTIFIER }}
+                  />
+                  <span className="text-sm font-medium text-slate-700 flex-1">
+                    Signature areas
+                  </span>
+                  <span className="text-xs text-slate-500">
+                    {signatureRegions.length}
+                  </span>
+                </div>
+                <div>
+                  {signatureRegions.map((region) => (
+                    <div
+                      key={region.id}
+                      className={`
+                        px-5 py-3 cursor-pointer transition-all duration-150
+                        border-l-2 hover:bg-slate-50
+                        ${region.id === selectedRegionId ? 'bg-slate-50' : ''}
+                      `}
+                      style={{
+                        borderLeftColor: region.id === selectedRegionId ? ENTITY_COLORS[region.label] : 'transparent',
+                      }}
+                      onClick={() => {
+                        onRegionSelect(region.id)
+                        onPageNavigate(region.pageIndex)
+                      }}
+                    >
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm text-slate-800 truncate font-medium" title="Signature area">
+                            Signature area
+                          </p>
+                          <div className="flex items-center gap-2 mt-1">
+                            <span className="text-xs text-slate-500">
+                              {t('common.page')}{region.pageIndex + 1}
+                            </span>
+                            <span className="text-slate-300">·</span>
+                            <span className="text-xs text-slate-500">
+                              {t(`entities.${region.label}`)}
+                            </span>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-0.5" onClick={(e) => e.stopPropagation()}>
+                          {onRegionLabelChange && (
+                            <div className="relative" ref={labelPickerRegionId === region.id ? labelPickerRef : undefined}>
+                              <button
+                                className="p-1.5 rounded-md text-slate-400 hover:text-primary-600 hover:bg-primary-50 transition-colors"
+                                onClick={() => {
+                                  setLabelPickerSpanId(null)
+                                  setLabelPickerRegionId(labelPickerRegionId === region.id ? null : region.id)
+                                }}
+                                title={t('popover.changeLabel')}
+                              >
+                                <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                  <path strokeLinecap="round" strokeLinejoin="round" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
+                                </svg>
+                              </button>
+                              {labelPickerRegionId === region.id && (
+                                <div className="absolute right-0 top-full mt-1 z-50 py-1 bg-white border border-slate-200 rounded-lg shadow-lg min-w-[140px] max-h-48 overflow-y-auto">
+                                  {ENTITY_LABELS.map((entityLabel) => (
+                                    <button
+                                      key={entityLabel}
+                                      className="w-full px-3 py-2 text-left text-sm flex items-center gap-2 hover:bg-slate-50 rounded-none first:rounded-t-lg last:rounded-b-lg"
+                                      style={{ color: region.label === entityLabel ? 'var(--color-primary-600)' : undefined }}
+                                      onClick={() => {
+                                        onRegionLabelChange(region.id, entityLabel)
+                                        setLabelPickerRegionId(null)
+                                      }}
+                                    >
+                                      <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: ENTITY_COLORS[entityLabel] }} />
+                                      {t(`entities.${entityLabel}`)}
+                                    </button>
+                                  ))}
+                                </div>
+                              )}
+                            </div>
+                          )}
+                          <button
+                            className="p-1.5 rounded-md text-slate-400 hover:text-danger-500 hover:bg-danger-50 transition-colors"
+                            onClick={() => onRegionRemove(region.id)}
+                            title={t('popover.remove')}
+                          >
+                            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                              <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                            </svg>
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          {Array.from(groupedSpans.entries()).map(([label, labelSpans]) => (
             <div key={label} className="border-b border-slate-100">
               {/* Label header */}
               <div className="px-5 py-3 bg-slate-50 flex items-center gap-3 sticky top-0 z-10">
@@ -337,7 +457,8 @@ export function Sidebar({
                 })}
               </div>
             </div>
-          ))
+          ))}
+          </>
         )}
       </div>
 

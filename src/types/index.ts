@@ -70,6 +70,16 @@ export function normalizeEntityLabel(label: string): EntityLabel {
   return 'IDENTIFIER'
 }
 
+// A detected redaction region (not tied to text spans/tokens)
+export interface RedactionRegion {
+  id: string
+  pageIndex: number
+  bbox: BBox
+  label: EntityLabel
+  source: 'pdf-annotation'
+  kind: 'signature'
+}
+
 // A detected span of text
 export interface DetectedSpan {
   id: string

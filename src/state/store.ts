@@ -8,6 +8,7 @@ import type { DocumentMeta } from './documentsPersistence'
 import type {
   PageModel,
   DetectedSpan,
+  RedactionRegion,
   TagEntry,
   ProcessingProgress,
   EntityLabel,
@@ -41,6 +42,7 @@ interface AppState {
   file: File | null
   pages: PageModel[]
   spans: DetectedSpan[]
+  regions: RedactionRegion[]
   tagMap: Map<string, TagEntry>
 
   // Corpus-wide rules (persisted in IndexedDB; also cached in sessionStorage for this tab)
@@ -50,6 +52,7 @@ interface AppState {
 
   // UI state
   selectedSpanId: string | null
+  selectedRegionId: string | null
   confidenceThreshold: number
   zoom: number
   currentPage: number
@@ -89,19 +92,24 @@ interface AppState {
   setFile: (file: File | null) => void
   setPages: (pages: PageModel[]) => void
   setSpans: (spans: DetectedSpan[]) => void
+  setRegions: (regions: RedactionRegion[]) => void
   addSpan: (span: DetectedSpan) => void
   addSpans: (spans: DetectedSpan[]) => void
   addPage: (page: PageModel) => void
   addPageSpans: (spans: DetectedSpan[]) => void
+  addPageRegions: (regions: RedactionRegion[]) => void
   removeSpan: (spanId: string) => void
   removeSpansByNormalizedText: (normalizedText: string) => number
   findSpansByNormalizedText: (normalizedText: string) => DetectedSpan[]
   updateSpanLabel: (spanId: string, label: EntityLabel) => void
   updateSpanLabelByNormalizedText: (normalizedText: string, label: EntityLabel) => number
+  removeRegion: (regionId: string) => void
+  updateRegionLabel: (regionId: string, label: EntityLabel) => void
   suppressText: (normalizedText: string) => void
   setLabelOverride: (normalizedText: string, label: EntityLabel) => void
   setForcedLabel: (normalizedText: string, label: EntityLabel) => void
   setSelectedSpan: (spanId: string | null) => void
+  setSelectedRegion: (regionId: string | null) => void
   setConfidenceThreshold: (threshold: number) => void
   setZoom: (zoom: number) => void
   setCurrentPage: (page: number) => void
@@ -132,11 +140,13 @@ const initialState = {
   file: null,
   pages: [],
   spans: [],
+  regions: [],
   tagMap: new Map<string, TagEntry>(),
   suppressedTexts: new Set<string>(),
   labelOverrides: new Map<string, EntityLabel>(),
   forcedLabels: new Map<string, EntityLabel>(),
   selectedSpanId: null,
+  selectedRegionId: null,
   confidenceThreshold: 0.5,
   zoom: 1,
   currentPage: 0,
@@ -184,7 +194,7 @@ function jsonReplacer(_key: string, value: unknown): unknown {
 // Documents are persisted in IndexedDB; we only persist auth + editor session + corpus rules cache.
 type PersistedState = Pick<AppState,
   'isAuthenticated' | 'user' | 'token' |
-  'pages' | 'spans' | 'suppressedTexts' | 'labelOverrides' | 'forcedLabels' |
+  'pages' | 'spans' | 'regions' | 'suppressedTexts' | 'labelOverrides' | 'forcedLabels' |
   'currentPage' | 'confidenceThreshold' | 'totalPageCount' | 'pageProcessingStatus' | 'isDirty' |
   'loadedDocumentId'
 >
@@ -202,6 +212,7 @@ const persistConfig: PersistOptions<AppState, PersistedState> = {
     token: state.token,
     pages: state.pages,
     spans: state.spans,
+    regions: state.regions,
     suppressedTexts: state.suppressedTexts,
     labelOverrides: state.labelOverrides,
     forcedLabels: state.forcedLabels,
@@ -218,6 +229,9 @@ const persistConfig: PersistOptions<AppState, PersistedState> = {
       // Normalize legacy entity labels (EMAIL, PHONE, etc. → IDENTIFIER)
       state.spans.forEach((s) => {
         s.label = normalizeEntityLabel(s.label)
+      })
+      state.regions.forEach((r) => {
+        r.label = normalizeEntityLabel(r.label)
       })
       state.labelOverrides = new Map(
         Array.from(state.labelOverrides.entries()).map(([k, v]) => [k, normalizeEntityLabel(v)])
@@ -279,11 +293,13 @@ export const useStore = create<AppState>()(
           state.file = null
           state.pages = []
           state.spans = []
+          state.regions = []
           state.tagMap = new Map()
           state.suppressedTexts = new Set()
           state.labelOverrides = new Map()
           state.forcedLabels = new Map()
           state.selectedSpanId = null
+          state.selectedRegionId = null
           state.pageProcessingStatus = new Map()
           state.totalPageCount = 0
           state.loadedDocumentId = null
@@ -338,6 +354,10 @@ export const useStore = create<AppState>()(
         get().updateTagMap()
       },
 
+      setRegions: (regions) => set((state) => {
+        state.regions = regions
+      }),
+
       addSpan: (span) => {
         set((state) => {
           state.spans.push(span)
@@ -374,6 +394,11 @@ export const useStore = create<AppState>()(
         get().updateTagMap()
       },
 
+      addPageRegions: (regions) => set((state) => {
+        if (!regions || regions.length === 0) return
+        state.regions.push(...regions)
+      }),
+
       removeSpan: (spanId) => {
         let removed = false
         set((state) => {
@@ -391,6 +416,16 @@ export const useStore = create<AppState>()(
           get().updateTagMap()
         }
       },
+
+      removeRegion: (regionId) => set((state) => {
+        const index = state.regions.findIndex((r) => r.id === regionId)
+        if (index !== -1) {
+          state.regions.splice(index, 1)
+          if (state.selectedRegionId === regionId) {
+            state.selectedRegionId = null
+          }
+        }
+      }),
 
       removeSpansByNormalizedText: (normalizedText) => {
         let removedCount = 0
@@ -438,6 +473,13 @@ export const useStore = create<AppState>()(
         }
       },
 
+      updateRegionLabel: (regionId, label) => set((state) => {
+        const region = state.regions.find((r) => r.id === regionId)
+        if (region) {
+          region.label = label
+        }
+      }),
+
       updateSpanLabelByNormalizedText: (normalizedText, label) => {
         let updatedCount = 0
         set((state) => {
@@ -481,6 +523,10 @@ export const useStore = create<AppState>()(
 
       setSelectedSpan: (spanId) => set((state) => {
         state.selectedSpanId = spanId
+      }),
+
+      setSelectedRegion: (regionId) => set((state) => {
+        state.selectedRegionId = regionId
       }),
 
       setConfidenceThreshold: (threshold) => set((state) => {
@@ -566,8 +612,10 @@ export const useStore = create<AppState>()(
         state.file = null
         state.pages = []
         state.spans = []
+        state.regions = []
         state.tagMap = new Map()
         state.selectedSpanId = null
+        state.selectedRegionId = null
         state.confidenceThreshold = 0.5
         state.zoom = 1
         state.currentPage = 0

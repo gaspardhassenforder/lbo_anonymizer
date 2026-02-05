@@ -21,6 +21,7 @@ export interface DocumentData {
   pdfData: ArrayBuffer
   pagesJson: string
   entitiesJson: string
+  regionsJson?: string
 }
 
 export interface CorpusRules {

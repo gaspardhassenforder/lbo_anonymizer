@@ -1,6 +1,6 @@
 import { useEffect, useState, useCallback, useRef } from 'react'
 import type { PDFDocumentProxy, PDFPageProxy } from 'pdfjs-dist'
-import type { PageModel, DetectedSpan, EntityLabel } from '../types'
+import type { PageModel, DetectedSpan, EntityLabel, RedactionRegion } from '../types'
 import { getPdfPage } from '../pdf/pdfLoader'
 import { PageView } from './PageView'
 import type { ScopeOption } from './ScopeSelectionDialog'
@@ -9,9 +9,12 @@ interface PdfViewerProps {
   document: PDFDocumentProxy
   pages: PageModel[]
   spans: DetectedSpan[]
+  regions: RedactionRegion[]
   zoom: number
   selectedSpanId: string | null
+  selectedRegionId: string | null
   onSpanClick: (span: DetectedSpan) => void
+  onRegionClick: (region: RedactionRegion) => void
   onSpanRemove: (spanId: string) => void
   onSpanRemoveAllByText: (normalizedText: string) => void
   onSpanLabelChange: (spanId: string, label: EntityLabel) => void
@@ -29,9 +32,12 @@ export function PdfViewer({
   document,
   pages,
   spans,
+  regions,
   zoom,
   selectedSpanId,
+  selectedRegionId,
   onSpanClick,
+  onRegionClick,
   onSpanRemove,
   onSpanRemoveAllByText,
   onSpanLabelChange,
@@ -178,9 +184,12 @@ export function PdfViewer({
               page={pdfPage}
               pageModel={pageModel}
               spans={spans}
+              regions={regions}
               scale={zoom}
               selectedSpanId={selectedSpanId}
+              selectedRegionId={selectedRegionId}
               onSpanClick={onSpanClick}
+              onRegionClick={onRegionClick}
               onSpanRemove={onSpanRemove}
               onSpanRemoveAllByText={onSpanRemoveAllByText}
               onSpanLabelChange={onSpanLabelChange}

@@ -1,7 +1,7 @@
 import { useEffect, useState, useCallback } from 'react'
 import { useTranslation } from 'react-i18next'
 import type { PDFDocumentProxy, PDFPageProxy } from 'pdfjs-dist'
-import type { PageModel, DetectedSpan, EntityLabel, PageProcessingStatus } from '../types'
+import type { PageModel, DetectedSpan, EntityLabel, PageProcessingStatus, RedactionRegion } from '../types'
 import { getPdfPage } from '../pdf/pdfLoader'
 import { PageView } from './PageView'
 import { PageDotsNavigation } from './PageDotsNavigation'
@@ -11,14 +11,17 @@ interface PaginatedPdfViewerProps {
   document: PDFDocumentProxy
   pages: PageModel[]
   spans: DetectedSpan[]
+  regions: RedactionRegion[]
   zoom: number
   totalPageCount: number
   pageProcessingStatus: Map<number, PageProcessingStatus>
   currentPage: number
   selectedSpanId: string | null
+  selectedRegionId: string | null
   hasMultipleDocuments?: boolean
   onPageChange: (pageIndex: number) => void
   onSpanClick: (span: DetectedSpan) => void
+  onRegionClick: (region: RedactionRegion) => void
   onSpanRemove: (spanId: string) => void
   onSpanRemoveAllByText: (normalizedText: string) => void
   onSpanRemoveAllDocuments?: (normalizedText: string) => void
@@ -36,14 +39,17 @@ export function PaginatedPdfViewer({
   document,
   pages,
   spans,
+  regions,
   zoom,
   totalPageCount,
   pageProcessingStatus,
   currentPage,
   selectedSpanId,
+  selectedRegionId,
   hasMultipleDocuments = false,
   onPageChange,
   onSpanClick,
+  onRegionClick,
   onSpanRemove,
   onSpanRemoveAllByText,
   onSpanRemoveAllDocuments,
@@ -247,10 +253,13 @@ export function PaginatedPdfViewer({
             page={loadedPage}
             pageModel={pageModel}
             spans={spans}
+            regions={regions}
             scale={zoom}
             selectedSpanId={selectedSpanId}
+            selectedRegionId={selectedRegionId}
             hasMultipleDocuments={hasMultipleDocuments}
             onSpanClick={onSpanClick}
+            onRegionClick={onRegionClick}
             onSpanRemove={onSpanRemove}
             onSpanRemoveAllByText={onSpanRemoveAllByText}
             onSpanRemoveAllDocuments={onSpanRemoveAllDocuments}

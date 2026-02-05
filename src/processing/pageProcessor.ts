@@ -1,8 +1,9 @@
 import type { PDFDocumentProxy } from 'pdfjs-dist'
-import type { PageModel, DetectedSpan, EntityLabel } from '../types'
+import type { PageModel, DetectedSpan, EntityLabel, RedactionRegion } from '../types'
 import { getPdfPage } from '../pdf/pdfLoader'
 import { extractPageText, findTokensInRange } from '../pdf/textExtraction'
 import { renderPage, getCanvasImageData } from '../pdf/render'
+import { detectSignatureAnnotationRegions } from '../pdf/signatureAnnotations'
 import { ocrClient } from '../ocr/ocrClient'
 import { nerClient } from '../ner/nerClient'
 import { propagateEntitiesForPage } from '../ner/propagate'
@@ -12,6 +13,7 @@ import { normalizeText } from '../tagging/normalize'
 export interface PageProcessingResult {
   pageModel: PageModel
   spans: DetectedSpan[]
+  regions: RedactionRegion[]
 }
 
 export interface ProcessingCallbacks {
@@ -67,6 +69,9 @@ export async function processPage(
   console.log(`[PageProcessor] Starting page ${pageIndex}`)
   const page = await getPdfPage(document, pageIndex)
   console.log(`[PageProcessor] Got PDF page ${pageIndex}`)
+
+  // Tier-1 signature detection from PDF annotations (widgets/fields)
+  const regions = await detectSignatureAnnotationRegions(page, pageIndex)
 
   // Extract initial text structure
   let pageModel = await extractPageText(page, pageIndex)
@@ -184,6 +189,7 @@ export async function processPage(
   return {
     pageModel,
     spans: pageSpans,
+    regions,
   }
 }
 
@@ -297,6 +303,7 @@ export async function processDocumentProgressively(
         callbacks.onPageComplete?.(i, {
           pageModel: result.pageModel,
           spans: pageSpansWithPropagation,
+          regions: result.regions,
         })
       } catch (error) {
         callbacks.onPageError?.(i, error instanceof Error ? error : new Error(String(error)))

@@ -7,7 +7,7 @@ import { DocumentCard, Document } from '../components/DocumentCard'
 import { UploadModal } from '../components/UploadModal'
 import { loadPdf, getPdfPage } from '../pdf/pdfLoader'
 import { exportPdfAsBlob } from '../export/exportHybridPdf'
-import type { DetectedSpan, TagEntry, PageModel } from '../types'
+import type { DetectedSpan, TagEntry, PageModel, RedactionRegion } from '../types'
 import { normalizeEntityLabel } from '../types'
 import { ConfirmDialog } from '../components/ConfirmDialog'
 import {
@@ -120,6 +120,10 @@ export default function DocumentListPage() {
 
       const rawEntities = JSON.parse(savedData.entitiesJson || '[]') as DetectedSpan[]
       const entities = rawEntities.map((s) => ({ ...s, label: normalizeEntityLabel(s.label) }))
+      const rawRegions = JSON.parse(savedData.regionsJson || '[]') as RedactionRegion[]
+      const regions = Array.isArray(rawRegions)
+        ? rawRegions.map((r) => ({ ...r, label: normalizeEntityLabel(r.label) }))
+        : []
 
       // Load PDF document from stored data
       const { document: pdfDoc, numPages } = await loadPdf(savedData.pdfData)
@@ -176,7 +180,8 @@ export default function DocumentListPage() {
         pdfDoc,
         pageModels,
         entities,
-        tagMap
+        tagMap,
+        regions
       )
 
       // Download
