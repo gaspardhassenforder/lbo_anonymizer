@@ -74,17 +74,13 @@ async function detect(
     spans.push(...regexSpans)
 
     // Run DocuSign signature rule using token geometry
-    let hasDocuSign = false
     if (tokens.length > 0) {
       const docusignSpans = detectDocuSignSignatures(tokens, pageIndex)
-      if (docusignSpans.length > 0) {
-        hasDocuSign = true
-        spans.push(...docusignSpans)
-      }
+      spans.push(...docusignSpans)
     }
 
     // Run NER model if loaded
-    if (!hasDocuSign && model?.isLoaded?.() && nerModule) {
+    if (model?.isLoaded?.() && nerModule) {
       try {
         const nerResults = await model.predict(text)
 
