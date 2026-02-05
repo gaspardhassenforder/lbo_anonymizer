@@ -40,7 +40,8 @@
     "exportJson": "Export JSON",
     "exportPdf": "Export PDF",
     "newFile": "New file",
-    "confirmAnonymisation": "Confirm"
+    "confirmAnonymisation": "Confirm",
+    "confirmDisabledHint": "{{count}}/{{total}} pages processed. Please wait until all pages are processed before confirming."
   },
   "documents": {
     "title": "Your Documents",

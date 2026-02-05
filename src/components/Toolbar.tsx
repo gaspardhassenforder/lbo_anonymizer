@@ -1,3 +1,4 @@
+import { useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useStore, useTemporalStore } from '../state/store'
 
@@ -19,7 +20,20 @@ export function Toolbar({
   const { t } = useTranslation()
   const zoom = useStore((state) => state.zoom)
   const setZoom = useStore((state) => state.setZoom)
+  const pageProcessingStatus = useStore((state) => state.pageProcessingStatus)
+  const totalPageCount = useStore((state) => state.totalPageCount)
   const temporalStore = useTemporalStore()
+  const [confirmHover, setConfirmHover] = useState(false)
+
+  const totalPages = totalPageCount || pageCount
+  const processedCount = useMemo(() => {
+    let count = 0
+    for (let i = 0; i < totalPages; i++) {
+      if (pageProcessingStatus.get(i) === 'ready') count++
+    }
+    return count
+  }, [pageProcessingStatus, totalPages])
+  const allPagesProcessed = totalPages > 0 && processedCount === totalPages
 
   const canUndo = temporalStore.getState().pastStates.length > 0
   const canRedo = temporalStore.getState().futureStates.length > 0
@@ -128,23 +142,40 @@ export function Toolbar({
       {/* Divider */}
       <div className="h-8 w-px bg-slate-200" />
 
-      {/* Confirm button */}
-      <button
-        className="
-          group flex items-center gap-2 px-4 py-2 rounded-lg
-          bg-success-600 hover:bg-success-700
-          text-white font-medium
-          shadow-sm
-          transition-all duration-150
-        "
-        onClick={onConfirmAnonymisation}
-        title={t('toolbar.confirmAnonymisation')}
+      {/* Confirm button — disabled until all pages processed; hover shows progress */}
+      <div
+        className="relative"
+        onMouseEnter={() => setConfirmHover(true)}
+        onMouseLeave={() => setConfirmHover(false)}
       >
-        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-          <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-        </svg>
-        <span className="text-sm">{t('toolbar.confirmAnonymisation')}</span>
-      </button>
+        <button
+          className={`
+            flex items-center gap-2 px-4 py-2 rounded-lg font-medium shadow-sm
+            transition-all duration-150
+            ${allPagesProcessed
+              ? 'bg-success-600 hover:bg-success-700 text-white cursor-pointer'
+              : 'bg-slate-300 text-slate-500 cursor-not-allowed'
+            }
+          `}
+          onClick={allPagesProcessed ? onConfirmAnonymisation : undefined}
+          disabled={!allPagesProcessed}
+          title={allPagesProcessed ? t('toolbar.confirmAnonymisation') : undefined}
+        >
+          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+          </svg>
+          <span className="text-sm">{t('toolbar.confirmAnonymisation')}</span>
+        </button>
+        {!allPagesProcessed && confirmHover && totalPages > 0 && (
+          <div
+            className="absolute z-50 top-full left-1/2 -translate-x-1/2 mt-2 w-max max-w-[min(16rem,90vw)] px-3 py-2 rounded-lg bg-slate-800 text-white text-sm leading-snug text-center shadow-lg pointer-events-none"
+            role="tooltip"
+          >
+            <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1 border-4 border-transparent border-b-slate-800" />
+            {t('toolbar.confirmDisabledHint', { count: processedCount, total: totalPages })}
+          </div>
+        )}
+      </div>
 
       {/* Divider */}
       <div className="h-8 w-px bg-slate-200" />
