@@ -137,6 +137,7 @@ export interface NerWorkerRequest {
   type: 'LOAD_MODEL' | 'DETECT'
   text?: string
   pageIndex?: number
+  tokens?: Token[]
 }
 
 export interface NerWorkerResponse {

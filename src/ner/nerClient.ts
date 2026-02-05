@@ -144,6 +144,7 @@ class NerClient {
         type: 'DETECT',
         text,
         pageIndex,
+        tokens,
       } satisfies NerWorkerRequest)
     })
   }

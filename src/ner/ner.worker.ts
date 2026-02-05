@@ -1,5 +1,6 @@
-import type { NerWorkerRequest, NerWorkerResponse, DetectedSpan } from '../types'
+import type { NerWorkerRequest, NerWorkerResponse, DetectedSpan, Token } from '../types'
 import { detectWithPatterns, patternMatchesToSpans } from './patterns'
+import { detectDocuSignSignatures } from './docusignSignature'
 
 // ============================================================================
 // NER MODEL CONFIGURATION
@@ -61,7 +62,8 @@ async function loadModel(): Promise<void> {
 
 async function detect(
   text: string,
-  pageIndex: number
+  pageIndex: number,
+  tokens: Token[]
 ): Promise<void> {
   const spans: Array<Omit<DetectedSpan, 'id' | 'tokens'>> = []
 
@@ -71,8 +73,18 @@ async function detect(
     const regexSpans = patternMatchesToSpans(regexMatches, pageIndex)
     spans.push(...regexSpans)
 
+    // Run DocuSign signature rule using token geometry
+    let hasDocuSign = false
+    if (tokens.length > 0) {
+      const docusignSpans = detectDocuSignSignatures(tokens, pageIndex)
+      if (docusignSpans.length > 0) {
+        hasDocuSign = true
+        spans.push(...docusignSpans)
+      }
+    }
+
     // Run NER model if loaded
-    if (model?.isLoaded?.() && nerModule) {
+    if (!hasDocuSign && model?.isLoaded?.() && nerModule) {
       try {
         const nerResults = await model.predict(text)
 
@@ -116,7 +128,7 @@ self.onmessage = async (e: MessageEvent<NerWorkerRequest>) => {
 
       case 'DETECT':
         if (request.text !== undefined && request.pageIndex !== undefined) {
-          await detect(request.text, request.pageIndex)
+          await detect(request.text, request.pageIndex, request.tokens ?? [])
         }
         break
     }
