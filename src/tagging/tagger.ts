@@ -1,23 +1,25 @@
 import type { DetectedSpan, EntityLabel, TagEntry } from '../types'
+import { normalizeEntityLabel } from '../types'
 import { normalizeText } from './normalize'
 
 /**
  * Generate a tag string from label and index
- * e.g., [PERSON_1], [EMAIL_3]
+ * e.g., [PERSON_1], [IDENTIFIER_3]
  */
 export function generateTag(label: EntityLabel, index: number): string {
   return `[${label}_${index}]`
 }
 
 /**
- * Parse a tag string back to label and index
+ * Parse a tag string back to label and index.
+ * Legacy labels (EMAIL, PHONE, etc.) are normalized to IDENTIFIER.
  */
 export function parseTag(tag: string): { label: EntityLabel; index: number } | null {
   const match = tag.match(/^\[([A-Z_]+)_(\d+)\]$/)
   if (!match) return null
 
   return {
-    label: match[1] as EntityLabel,
+    label: normalizeEntityLabel(match[1]),
     index: parseInt(match[2], 10),
   }
 }

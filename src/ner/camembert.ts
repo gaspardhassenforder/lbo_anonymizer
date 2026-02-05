@@ -16,7 +16,7 @@ const NER_TO_ENTITY_TYPE: Record<string, EntityLabel | null> = {
   'PER': 'PERSON',
   'ORG': 'ORGANIZATION',
   'LOC': 'ADDRESS',
-  'MISC': null,  // Skip MISC entities
+  'MISC': null,  // Ignore MISC as a final label (see token selection logic)
   'O': null,     // Outside - not an entity
 }
 
@@ -25,8 +25,19 @@ const NER_TO_ENTITY_TYPE: Record<string, EntityLabel | null> = {
 const MAX_CHUNK_CHARS = 1500
 const CHUNK_OVERLAP = 200
 
-// Minimum probability threshold for entity detection
-const MIN_ENTITY_PROB = 0.3
+/**
+ * Per-category thresholds (tune later as needed).
+ * - PER is intentionally low to catch partial names.
+ * - ORG/LOC use explicit values for now.
+ * - MISC is ignored as a final label, but we keep its probability for analysis.
+ */
+const ENTITY_THRESHOLD_BY_TYPE: Record<BaseEntityType, number> = {
+  PER: 0.05,
+  ORG: 0.3,
+  LOC: 0.3,
+  MISC: 1, // Ignored as a final label; not selected.
+  O: 1,
+}
 
 // Common French words to filter out as false positives (standalone only)
 // Note: Address-related words (rue, avenue, etc.) are NOT filtered - they're handled by merging
@@ -389,23 +400,25 @@ export class CamembertModel {
       // Aggregate BIO labels to base types
       const baseProbs = this.aggregateBIOProbs(probs, this.id2label)
 
-      // Find the BEST non-O label (don't compare against O here!)
-      // We'll apply thresholds later in aggregation
+      // Find the BEST non-MISC label (PER/ORG/LOC only).
+      // We ignore MISC as a final label, but still keep its probability in baseProbs
+      // so we can tune thresholds later without losing information.
+      const candidateLabels: BaseEntityType[] = ['PER', 'ORG', 'LOC']
       let bestEntityLabel: BaseEntityType = 'O'
       let bestEntityProb = 0
 
-      for (const [label, prob] of Object.entries(baseProbs)) {
-        if (label !== 'O' && prob > bestEntityProb) {
-          bestEntityLabel = label as BaseEntityType
+      for (const label of candidateLabels) {
+        const prob = baseProbs[label]
+        if (prob > bestEntityProb) {
+          bestEntityLabel = label
           bestEntityProb = prob
         }
       }
 
-      // Determine if this token should be considered an entity
-      // Use threshold of 0.05 for PER (we want to catch all potential names)
-      // Use MIN_ENTITY_PROB for others
-      const threshold = bestEntityLabel === 'PER' ? 0.05 : MIN_ENTITY_PROB
-      const isEntityToken = bestEntityProb >= threshold
+      // Determine if this token should be considered an entity.
+      // Thresholds are per-category so we can tune them independently later.
+      const threshold = ENTITY_THRESHOLD_BY_TYPE[bestEntityLabel] ?? 1
+      const isEntityToken = bestEntityLabel !== 'O' && bestEntityProb >= threshold
 
       // If it's an entity token, use the entity label; otherwise O
       const winningLabel = isEntityToken ? bestEntityLabel : 'O'
@@ -820,9 +833,10 @@ export class CamembertModel {
       if (displayBaseType === 'MISC') {
         const candidates: BaseEntityType[] = ['PER', 'ORG', 'LOC']
         let best: BaseEntityType | null = null
-        let bestProb = MIN_ENTITY_PROB
+        let bestProb = 0
         for (const c of candidates) {
-          if (entity.avgProbs[c] > bestProb) {
+          const threshold = ENTITY_THRESHOLD_BY_TYPE[c] ?? 1
+          if (entity.avgProbs[c] >= threshold && entity.avgProbs[c] > bestProb) {
             bestProb = entity.avgProbs[c]
             best = c
           }

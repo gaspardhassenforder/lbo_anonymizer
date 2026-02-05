@@ -82,6 +82,9 @@ const DATE_PATTERNS = [
   /\b(0?[1-9]|[12][0-9]|3[01])\s+(janvier|février|mars|avril|mai|juin|juillet|août|septembre|octobre|novembre|décembre)\s+(19|20)\d{2}\b/gi,
 ]
 
+// Full "DocuSign Envelope ID: <UUID>" line (for anonymization)
+const DOCUSIGN_PATTERN = /DocuSign\s+Envelope\s+ID:\s*[A-F0-9]{8}-[A-F0-9]{4}-[0-9A-F]{4}-[A-F0-9]{4}-[A-F0-9]{12}/gi
+
 /**
  * Validate French SIREN/SIRET using Luhn algorithm
  */
@@ -143,7 +146,7 @@ export function detectWithPatterns(
   let match: RegExpExecArray | null
   const emailRegex = new RegExp(EMAIL_PATTERN.source, 'g')
   while ((match = emailRegex.exec(text)) !== null) {
-    addMatch('EMAIL', match, 0.95)
+    addMatch('IDENTIFIER', match, 0.95)
   }
 
   // Phone numbers
@@ -152,7 +155,7 @@ export function detectWithPatterns(
     while ((match = phoneRegex.exec(text)) !== null) {
       // Filter out numbers that are too short
       if (match[0].replace(/\D/g, '').length >= 10) {
-        addMatch('PHONE', match, 0.8)
+        addMatch('IDENTIFIER', match, 0.8)
       }
     }
   }
@@ -160,7 +163,7 @@ export function detectWithPatterns(
   // IBAN
   const ibanRegex = new RegExp(IBAN_PATTERN.source, 'gi')
   while ((match = ibanRegex.exec(text)) !== null) {
-    addMatch('IBAN', match, 0.95)
+    addMatch('IDENTIFIER', match, 0.95)
   }
 
   // SIRET first (more specific, 14 digits)
@@ -168,21 +171,22 @@ export function detectWithPatterns(
   while ((match = siretRegex.exec(text)) !== null) {
     const digits = match[0].replace(/\D/g, '')
     if (digits.length === 14) {
-      addMatch('SIRET', match, 0.85, isValidSiren)
+      addMatch('IDENTIFIER', match, 0.85, isValidSiren)
     }
   }
 
-  // SIREN (9 digits, exclude if already matched as SIRET)
+  // SIREN (9 digits, exclude if already contained in a longer IDENTIFIER match e.g. SIRET)
   const sirenRegex = new RegExp(SIREN_PATTERN.source, 'g')
   while ((match = sirenRegex.exec(text)) !== null) {
     const digits = match[0].replace(/\D/g, '')
     if (digits.length === 9) {
-      // Check if this is part of a SIRET already matched
-      const isPartOfSiret = matches.some(
-        (m) => m.label === 'SIRET' && match!.index >= m.start && match!.index < m.end
+      const start = match.index
+      const end = match.index + match[0].length
+      const isPartOfLongerMatch = matches.some(
+        (m) => m.start <= start && m.end >= end && m.end - m.start > match![0].length
       )
-      if (!isPartOfSiret) {
-        addMatch('SIREN', match, 0.85, isValidSiren)
+      if (!isPartOfLongerMatch) {
+        addMatch('IDENTIFIER', match, 0.85, isValidSiren)
       }
     }
   }
@@ -190,7 +194,13 @@ export function detectWithPatterns(
   // Capital amounts
   const capitalRegex = new RegExp(CAPITAL_PATTERN.source, 'gi')
   while ((match = capitalRegex.exec(text)) !== null) {
-    addMatch('CAPITAL', match, 0.85)
+    addMatch('IDENTIFIER', match, 0.85)
+  }
+
+  // DocuSign Envelope ID (full line with UUID)
+  const docusignRegex = new RegExp(DOCUSIGN_PATTERN.source, 'gi')
+  while ((match = docusignRegex.exec(text)) !== null) {
+    addMatch('IDENTIFIER', match, 0.95)
   }
 
   // Dates

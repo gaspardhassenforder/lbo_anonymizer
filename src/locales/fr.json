@@ -129,16 +129,8 @@
     "PERSON": "Personne",
     "ORGANIZATION": "Organisation",
     "ADDRESS": "Adresse",
-    "EMAIL": "Email",
-    "PHONE": "Téléphone",
-    "SSN": "N° Sécurité Sociale",
-    "IBAN": "IBAN",
-    "BANK_ACCOUNT": "Compte Bancaire",
-    "CREDIT_CARD": "Carte de Crédit",
     "DATE": "Date",
-    "SIREN": "SIREN",
-    "SIRET": "SIRET",
-    "CAPITAL": "Capital"
+    "IDENTIFIER": "Identifiant"
   },
   "privacy": {
     "title": "Vos données sont protégées",

@@ -26,31 +26,21 @@ export interface PageModel {
   hasOcr: boolean
 }
 
-// Entity labels we detect
+// Entity labels we detect (main tags + generalist Identifier for the rest)
 export type EntityLabel =
   | 'PERSON'
   | 'ORGANIZATION'
   | 'ADDRESS'
-  | 'EMAIL'
-  | 'PHONE'
-  | 'IBAN'
   | 'DATE'
-  | 'SIREN'
-  | 'SIRET'
-  | 'CAPITAL'
+  | 'IDENTIFIER'
 
 // Entity labels array for iteration
 export const ENTITY_LABELS: EntityLabel[] = [
   'PERSON',
   'ORGANIZATION',
   'ADDRESS',
-  'EMAIL',
-  'PHONE',
-  'IBAN',
   'DATE',
-  'SIREN',
-  'SIRET',
-  'CAPITAL',
+  'IDENTIFIER',
 ]
 
 // Entity colors for visualization
@@ -58,13 +48,26 @@ export const ENTITY_COLORS: Record<EntityLabel, string> = {
   PERSON: '#3b82f6',       // blue
   ORGANIZATION: '#8b5cf6', // violet
   ADDRESS: '#10b981',      // emerald
-  EMAIL: '#f59e0b',        // amber
-  PHONE: '#06b6d4',        // cyan
-  IBAN: '#ec4899',         // pink
   DATE: '#6366f1',         // indigo
-  SIREN: '#14b8a6',        // teal
-  SIRET: '#0ea5e9',        // sky
-  CAPITAL: '#a855f7',      // purple
+  IDENTIFIER: '#f59e0b',   // amber (email, phone, IBAN, SIREN, SIRET, refs, etc.)
+}
+
+// Legacy labels (from before consolidation) → map to IDENTIFIER for backward compatibility
+const LEGACY_LABEL_MAP: Record<string, EntityLabel> = {
+  EMAIL: 'IDENTIFIER',
+  PHONE: 'IDENTIFIER',
+  IBAN: 'IDENTIFIER',
+  SIREN: 'IDENTIFIER',
+  SIRET: 'IDENTIFIER',
+  CAPITAL: 'IDENTIFIER',
+}
+
+/** Normalize a label (e.g. from persisted data or tags) to a current EntityLabel. */
+export function normalizeEntityLabel(label: string): EntityLabel {
+  const current = LEGACY_LABEL_MAP[label]
+  if (current) return current
+  if (ENTITY_LABELS.includes(label as EntityLabel)) return label as EntityLabel
+  return 'IDENTIFIER'
 }
 
 // A detected span of text

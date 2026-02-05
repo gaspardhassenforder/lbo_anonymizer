@@ -3,6 +3,7 @@ import { useNavigate, useSearchParams, useBlocker, useLocation } from 'react-rou
 import { useTranslation } from 'react-i18next'
 import type { PDFDocumentProxy } from 'pdfjs-dist'
 import type { DetectedSpan, EntityLabel } from '../types'
+import { normalizeEntityLabel } from '../types'
 import { useStore, getInstanceCount, normalizeText } from '../state/store'
 import { loadPdf } from '../pdf/pdfLoader'
 import { propagateEntities } from '../ner/propagate'
@@ -107,8 +108,12 @@ export default function App() {
         setSavedDocuments(metas)
         setCorpusRules({
           suppressedTexts: new Set(rules.suppressedTexts),
-          labelOverrides: new Map(rules.labelOverrides),
-          forcedLabels: new Map(rules.forcedLabels),
+          labelOverrides: new Map(
+            rules.labelOverrides.map(([k, v]) => [k, normalizeEntityLabel(v as string)])
+          ),
+          forcedLabels: new Map(
+            rules.forcedLabels.map(([k, v]) => [k, normalizeEntityLabel(v as string)])
+          ),
         })
       } catch (e) {
         console.error('[App] Failed to hydrate from IndexedDB:', e)
@@ -278,9 +283,13 @@ export default function App() {
           console.warn('[App] Failed to persist PDF to IndexedDB:', e)
         }
 
-        // Hydrate pages/spans without running OCR/NER
+        // Hydrate pages/spans without running OCR/NER (normalize legacy labels)
         setPages(Array.isArray(storedPages) ? storedPages : [])
-        setSpans(Array.isArray(entities) ? entities : [])
+        setSpans(
+          Array.isArray(entities)
+            ? entities.map((s) => ({ ...s, label: normalizeEntityLabel(s.label) }))
+            : []
+        )
 
         // Mark all pages ready in status map
         for (let i = 0; i < numPages; i++) {

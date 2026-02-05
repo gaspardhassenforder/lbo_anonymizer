@@ -8,6 +8,7 @@ import { UploadModal } from '../components/UploadModal'
 import { loadPdf, getPdfPage } from '../pdf/pdfLoader'
 import { exportPdfAsBlob } from '../export/exportHybridPdf'
 import type { DetectedSpan, TagEntry, PageModel } from '../types'
+import { normalizeEntityLabel } from '../types'
 import { ConfirmDialog } from '../components/ConfirmDialog'
 import {
   deleteDocumentMeta,
@@ -117,7 +118,8 @@ export default function DocumentListPage() {
       const savedData = await getDocumentData(doc.id)
       if (!savedData) throw new Error('Document data not found')
 
-      const entities = JSON.parse(savedData.entitiesJson || '[]') as DetectedSpan[]
+      const rawEntities = JSON.parse(savedData.entitiesJson || '[]') as DetectedSpan[]
+      const entities = rawEntities.map((s) => ({ ...s, label: normalizeEntityLabel(s.label) }))
 
       // Load PDF document from stored data
       const { document: pdfDoc, numPages } = await loadPdf(savedData.pdfData)

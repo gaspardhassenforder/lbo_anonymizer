@@ -14,6 +14,7 @@ import type {
   PageProcessingStatus,
   ModelLoadingProgress,
 } from '../types'
+import { normalizeEntityLabel } from '../types'
 
 // Enable Map and Set support for immer
 enableMapSet()
@@ -211,9 +212,19 @@ const persistConfig: PersistOptions<AppState, PersistedState> = {
     isDirty: state.isDirty,
     loadedDocumentId: state.loadedDocumentId,
   }),
-  // After hydration, rebuild derived state
+  // After hydration, normalize legacy labels and rebuild derived state
   onRehydrateStorage: () => (state) => {
     if (state) {
+      // Normalize legacy entity labels (EMAIL, PHONE, etc. → IDENTIFIER)
+      state.spans.forEach((s) => {
+        s.label = normalizeEntityLabel(s.label)
+      })
+      state.labelOverrides = new Map(
+        Array.from(state.labelOverrides.entries()).map(([k, v]) => [k, normalizeEntityLabel(v)])
+      )
+      state.forcedLabels = new Map(
+        Array.from(state.forcedLabels.entries()).map(([k, v]) => [k, normalizeEntityLabel(v)])
+      )
       console.log('[Store] Rehydrated from sessionStorage:', {
         pages: state.pages.length,
         spans: state.spans.length,
