@@ -32,9 +32,9 @@ const CHUNK_OVERLAP = 200
  * - MISC is ignored as a final label, but we keep its probability for analysis.
  */
 const ENTITY_THRESHOLD_BY_TYPE: Record<BaseEntityType, number> = {
-  PER: 0.05,
-  ORG: 0.3,
-  LOC: 0.3,
+  PER: 0.60,
+  ORG: 0.70,
+  LOC: 0.60,
   MISC: 1, // Ignored as a final label; not selected.
   O: 1,
 }
