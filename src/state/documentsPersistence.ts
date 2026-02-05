@@ -110,6 +110,12 @@ export async function wipeAllLocalData(): Promise<void> {
 
   // Also clear any legacy single-PDF persistence
   await cleanupLegacyPersistence()
+
+  // Reset editor UI preferences so help popup and hints show again after next login
+  if (typeof localStorage !== 'undefined') {
+    localStorage.removeItem('lbo-anonymizer-editor-help-dismissed')
+    localStorage.removeItem('lbo-anonymizer-select-hint-dismissed')
+  }
 }
 
 /**
