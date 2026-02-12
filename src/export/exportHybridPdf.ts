@@ -1,15 +1,27 @@
 import { PDFDocument, rgb, StandardFonts } from 'pdf-lib'
 import type { PDFDocumentProxy } from 'pdfjs-dist'
-import type { PageModel, DetectedSpan, TagEntry, RedactionRegion } from '../types'
+import type { PageModel, DetectedSpan, TagEntry, RedactionRegion, BBox } from '../types'
 import { getPdfPage } from '../pdf/pdfLoader'
 import { renderPageToImage } from '../pdf/render'
 import { getTagForSpan } from '../tagging/tagger'
-import { mergeBBoxesByLine, mergeBBoxes } from '../pdf/geometry'
+import { mergeBBoxesByLine, bboxOverlap } from '../pdf/geometry'
+
+const TAG_FONT_SIZE = 7
+const TAG_PADDING_X = 2
+const TAG_PADDING_Y = 2
 
 interface ExportProgress {
   stage: 'rendering' | 'building' | 'complete'
   current: number
   total: number
+}
+
+interface RedactionDrawing {
+  span: DetectedSpan
+  sanitizedTag: string
+  lineBBoxes: BBox[]
+  tagTextWidth: number
+  finalFirstLineBBox: BBox
 }
 
 /**
@@ -73,21 +85,151 @@ export async function exportHybridPdf(
       }
     }
 
-    // Draw black redaction rectangles over detected spans
-    // Use merged bboxes for continuous redaction (e.g., "John Smith" = one rectangle)
-    for (const span of pageSpans) {
-      const tokenBBoxes = span.tokens.map((token) => token.bbox)
-      const mergedBBoxes = mergeBBoxesByLine(tokenBBoxes, 5)
+    // === Phase A: Pre-compute RedactionDrawing[] ===
+    const redactionDrawings: RedactionDrawing[] = []
 
-      for (const bbox of mergedBBoxes) {
+    for (const span of pageSpans) {
+      const tag = getTagForSpan(span, tagMap)
+      const sanitizedTag = sanitizeText(tag)
+
+      const tokenBBoxes = span.tokens.map((token) => token.bbox)
+      const lineBBoxes = mergeBBoxesByLine(tokenBBoxes, 5)
+      if (lineBBoxes.length === 0) continue
+
+      // Add vertical padding to all line bboxes
+      for (let j = 0; j < lineBBoxes.length; j++) {
+        lineBBoxes[j] = {
+          x: lineBBoxes[j].x,
+          y: lineBBoxes[j].y - TAG_PADDING_Y,
+          width: lineBBoxes[j].width,
+          height: lineBBoxes[j].height + TAG_PADDING_Y * 2,
+        }
+      }
+
+      const tagTextWidth = font.widthOfTextAtSize(sanitizedTag, TAG_FONT_SIZE)
+      const firstLineBBox = { ...lineBBoxes[0] }
+
+      // Expand first line bbox width if tag text is wider
+      const neededWidth = tagTextWidth + TAG_PADDING_X * 2
+      if (neededWidth > firstLineBBox.width) {
+        firstLineBBox.width = neededWidth
+      }
+
+      redactionDrawings.push({
+        span,
+        sanitizedTag,
+        lineBBoxes,
+        tagTextWidth,
+        finalFirstLineBBox: firstLineBBox,
+      })
+    }
+
+    // === Phase B: Collision detection ===
+    // Sort by first-line X coordinate (left-to-right processing)
+    redactionDrawings.sort((a, b) => a.finalFirstLineBBox.x - b.finalFirstLineBBox.x)
+
+    for (let j = 0; j < redactionDrawings.length; j++) {
+      const drawing = redactionDrawings[j]
+      const originalWidth = drawing.lineBBoxes[0].width
+      // Only check drawings that were width-expanded
+      if (drawing.finalFirstLineBBox.width <= originalWidth) continue
+
+      const expandedBBox = drawing.finalFirstLineBBox
+      const expandedCenterY = expandedBBox.y + expandedBBox.height / 2
+
+      let maxAllowedRight = expandedBBox.x + expandedBBox.width
+
+      // Check against non-redacted tokens to the right on the same line
+      for (const token of pageModel.tokens) {
+        if (redactedTokenIds.has(token.id)) continue
+        const tokenBBox = token.bbox
+        // Must be to the right of the original bbox
+        if (tokenBBox.x < expandedBBox.x + originalWidth) continue
+        // Must be on the same vertical line
+        const tokenCenterY = tokenBBox.y + tokenBBox.height / 2
+        if (Math.abs(tokenCenterY - expandedCenterY) > expandedBBox.height / 2) continue
+        // Check overlap
+        if (bboxOverlap(expandedBBox, tokenBBox)) {
+          maxAllowedRight = Math.min(maxAllowedRight, tokenBBox.x - 1)
+        }
+      }
+
+      // Check against other redaction drawings' first-line bboxes to the right
+      for (let k = j + 1; k < redactionDrawings.length; k++) {
+        const otherBBox = redactionDrawings[k].finalFirstLineBBox
+        // Must be to the right
+        if (otherBBox.x < expandedBBox.x + originalWidth) continue
+        // Must be on the same vertical line
+        const otherCenterY = otherBBox.y + otherBBox.height / 2
+        if (Math.abs(otherCenterY - expandedCenterY) > expandedBBox.height / 2) continue
+        // Check overlap
+        if (bboxOverlap(expandedBBox, otherBBox)) {
+          maxAllowedRight = Math.min(maxAllowedRight, otherBBox.x - 1)
+        }
+      }
+
+      // Truncate width but never shrink below original
+      const truncatedWidth = Math.max(originalWidth, maxAllowedRight - expandedBBox.x)
+      drawing.finalFirstLineBBox.width = truncatedWidth
+    }
+
+    // === Phase C: Unified drawing pass ===
+    for (const drawing of redactionDrawings) {
+      // Draw first-line black rectangle (possibly expanded)
+      newPage.drawRectangle({
+        x: drawing.finalFirstLineBBox.x,
+        y: drawing.finalFirstLineBBox.y,
+        width: drawing.finalFirstLineBBox.width,
+        height: drawing.finalFirstLineBBox.height,
+        color: rgb(0, 0, 0),
+        opacity: 1,
+      })
+
+      // Draw remaining-line black rectangles (vertical padding only, no width expansion)
+      for (let j = 1; j < drawing.lineBBoxes.length; j++) {
+        const bbox = drawing.lineBBoxes[j]
         newPage.drawRectangle({
           x: bbox.x,
-          y: bbox.y,  // Already in PDF coords (bottom-left origin)
+          y: bbox.y,
           width: bbox.width,
           height: bbox.height,
-          color: rgb(0, 0, 0),  // Solid black
+          color: rgb(0, 0, 0),
           opacity: 1,
         })
+      }
+
+      // Draw white tag text (visible) and invisible tag text (for copy-paste/search)
+      if (drawing.sanitizedTag.trim()) {
+        const textX = drawing.finalFirstLineBBox.x + TAG_PADDING_X
+        const textY =
+          drawing.finalFirstLineBBox.y +
+          drawing.finalFirstLineBBox.height / 2 -
+          TAG_FONT_SIZE / 2 +
+          TAG_FONT_SIZE * 0.15 // baseline adjustment
+
+        try {
+          // Visible white tag text
+          newPage.drawText(drawing.sanitizedTag, {
+            x: textX,
+            y: textY,
+            size: TAG_FONT_SIZE,
+            font,
+            color: rgb(1, 1, 1),
+            opacity: 1,
+          })
+
+          // Invisible tag text for copy-paste and search
+          newPage.drawText(drawing.sanitizedTag, {
+            x: textX,
+            y: textY,
+            size: TAG_FONT_SIZE,
+            font,
+            color: rgb(0, 0, 0),
+            opacity: 0,
+          })
+        } catch {
+          // Skip if text drawing fails
+        }
       }
     }
 
@@ -105,7 +247,7 @@ export async function exportHybridPdf(
     }
 
     // Add positioned text layer for selectability/searchability
-    // Layer 1: Non-redacted tokens at their original positions
+    // Non-redacted tokens at their original positions
     for (const token of pageModel.tokens) {
       if (redactedTokenIds.has(token.id)) continue // Skip redacted tokens
 
@@ -124,36 +266,6 @@ export async function exportHybridPdf(
         })
       } catch {
         // Skip tokens that fail (unsupported characters)
-      }
-    }
-
-    // Layer 2: Anonymization tags at redaction positions
-    for (const span of pageSpans) {
-      const tag = getTagForSpan(span, tagMap)
-      const sanitizedTag = sanitizeText(tag)
-
-      // Get the merged bbox for the entire span
-      const tokenBBoxes = span.tokens.map((token) => token.bbox)
-      const mergedBBox = mergeBBoxes(tokenBBoxes)
-
-      // Calculate font size that fits within the box
-      // Estimate text width: ~0.55 * fontSize * charCount for Helvetica
-      const maxFontByHeight = mergedBBox.height * 0.65
-      const maxFontByWidth = (mergedBBox.width - 4) / (sanitizedTag.length * 0.55)
-      const fontSize = Math.max(4, Math.min(maxFontByHeight, maxFontByWidth, 10))
-
-      try {
-        // Draw the tag as white text on black background (visible and selectable)
-        newPage.drawText(sanitizedTag, {
-          x: mergedBBox.x + 2,
-          y: mergedBBox.y + mergedBBox.height * 0.25,
-          size: fontSize,
-          font,
-          color: rgb(1, 1, 1), // White text on black redaction
-          opacity: 1,
-        })
-      } catch {
-        // Skip if text drawing fails
       }
     }
   }
