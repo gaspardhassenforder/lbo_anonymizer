@@ -8,8 +8,7 @@ import { exportPdfAsBlob } from '../export/exportHybridPdf'
 import type { DetectedSpan, TagEntry, PageModel, RedactionRegion } from '../types'
 import { normalizeEntityLabel } from '../types'
 
-const UPLOAD_URL = 'https://lbouploadovxwraxy-pdf-upload.functions.fnc.fr-par.scw.cloud'
-const MAX_BASE64_SIZE = 4.5 * 1024 * 1024 // 4.5 MB
+const FUNCTION_URL = 'https://lbouploadovxwraxy-pdf-upload.functions.fnc.fr-par.scw.cloud'
 
 type Phase = 'questionnaire' | 'uploading' | 'result'
 
@@ -17,20 +16,6 @@ interface ShareModalProps {
   isOpen: boolean
   onClose: () => void
   documents: SavedDocumentMeta[]
-}
-
-function blobToBase64(blob: Blob): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader()
-    reader.onload = () => {
-      const dataUrl = reader.result as string
-      // Strip the "data:...;base64," prefix
-      const base64 = dataUrl.split(',')[1]
-      resolve(base64)
-    }
-    reader.onerror = reject
-    reader.readAsDataURL(blob)
-  })
 }
 
 export function ShareModal({ isOpen, onClose, documents }: ShareModalProps) {
@@ -78,7 +63,8 @@ export function ShareModal({ isOpen, onClose, documents }: ShareModalProps) {
     setUploadTotal(total)
 
     try {
-      // Upload each document sequentially
+      // Step 1: Generate all PDF blobs sequentially (avoids memory pressure)
+      const generatedFiles: { filename: string; blob: Blob }[] = []
       for (let i = 0; i < documents.length; i++) {
         setUploadCurrent(i + 1)
         const doc = documents[i]
@@ -128,7 +114,7 @@ export function ShareModal({ isOpen, onClose, documents }: ShareModalProps) {
           const key = normalizeText(entity.text)
           if (!tagMap.has(key)) {
             const existingOfLabel = Array.from(tagMap.values()).filter(
-              (t) => t.label === entity.label
+              (te) => te.label === entity.label
             ).length + 1
             tagMap.set(key, {
               tag: `${entity.label}_${existingOfLabel}`,
@@ -143,37 +129,51 @@ export function ShareModal({ isOpen, onClose, documents }: ShareModalProps) {
           }
         })
 
-        // Generate PDF blob
         const anonymizedBlob = await exportPdfAsBlob(pdfDoc, pageModels, entities, tagMap, regions)
-
-        // Convert to base64
-        const base64 = await blobToBase64(anonymizedBlob)
-
-        // Size check
-        if (base64.length > MAX_BASE64_SIZE) {
-          throw new Error(t('share.tooLarge', { filename: doc.filename }))
-        }
-
-        // Upload PDF
         const filename = doc.filename.replace(/\.pdf$/i, '_anonymized.pdf')
-        const resp = await fetch(UPLOAD_URL, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            sessionId,
-            type: 'pdf',
-            filename,
-            data: base64,
-          }),
+        generatedFiles.push({ filename, blob: anonymizedBlob })
+      }
+
+      // Step 2: Request presigned URLs from the function (tiny JSON request)
+      const presignResp = await fetch(FUNCTION_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'get-presigned-urls',
+          sessionId,
+          files: generatedFiles.map((f) => ({
+            filename: f.filename,
+            contentType: 'application/pdf',
+          })),
+        }),
+      })
+      if (!presignResp.ok) {
+        throw new Error(`Failed to get upload URLs: ${presignResp.status}`)
+      }
+      const { urls } = (await presignResp.json()) as {
+        urls: { filename: string; uploadUrl: string }[]
+      }
+
+      // Step 3: Upload each PDF directly to S3 via presigned URL (no size limit)
+      for (let i = 0; i < generatedFiles.length; i++) {
+        setUploadCurrent(i + 1)
+        const file = generatedFiles[i]
+        const urlEntry = urls.find((u) => u.filename === file.filename)
+        if (!urlEntry) throw new Error(`No presigned URL for ${file.filename}`)
+
+        const uploadResp = await fetch(urlEntry.uploadUrl, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/pdf' },
+          body: file.blob,
         })
-        if (!resp.ok) {
-          throw new Error(`Upload failed for ${doc.filename}: ${resp.status}`)
+        if (!uploadResp.ok) {
+          throw new Error(`Upload failed for ${file.filename}: ${uploadResp.status}`)
         }
       }
 
-      // Upload questionnaire
-      setUploadCurrent(total + 1) // signal questionnaire phase
-      const qResp = await fetch(UPLOAD_URL, {
+      // Step 4: Upload questionnaire via the function (small JSON)
+      setUploadCurrent(total + 1)
+      const qResp = await fetch(FUNCTION_URL, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
