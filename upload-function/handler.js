@@ -1,4 +1,5 @@
 import { S3Client, PutObjectCommand } from "@aws-sdk/client-s3";
+import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 
 const s3 = new S3Client({
   region: process.env.S3_REGION,
@@ -10,6 +11,7 @@ const s3 = new S3Client({
 });
 
 const BUCKET = process.env.S3_BUCKET;
+const PRESIGN_EXPIRY = 900; // 15 minutes
 
 const CORS_HEADERS = {
   "Access-Control-Allow-Origin": "*",
@@ -35,48 +37,84 @@ export function handle(event, context, cb) {
     return respond(405, { error: "Method not allowed" });
   }
 
-  return handleUpload(event);
+  return handleRequest(event);
 }
 
-async function handleUpload(event) {
+async function handleRequest(event) {
   try {
     const body = JSON.parse(event.body);
-    const { sessionId, type, filename, data } = body;
+    const { action } = body;
 
-    if (!sessionId || !type || !data) {
-      return respond(400, { error: "Missing sessionId, type, or data" });
+    if (action === "get-presigned-urls") {
+      return handlePresignedUrls(body);
     }
 
-    let key, contentType, buffer;
+    // Legacy: direct upload via JSON body (questionnaire only now)
+    return handleDirectUpload(body);
+  } catch (err) {
+    return respond(500, { error: "Request failed", details: err.message });
+  }
+}
 
-    if (type === "pdf") {
-      if (!filename) {
-        return respond(400, { error: "Missing filename for PDF upload" });
-      }
-      // PDF is sent as base64-encoded string
-      key = `${sessionId}/${filename}`;
-      contentType = "application/pdf";
-      buffer = Buffer.from(data, "base64");
-    } else if (type === "questionnaire") {
-      // Questionnaire is sent as a JSON object
-      key = `${sessionId}/questionnaire.json`;
-      contentType = "application/json";
-      buffer = Buffer.from(JSON.stringify(data, null, 2));
-    } else {
-      return respond(400, { error: "Invalid type. Use 'pdf' or 'questionnaire'" });
-    }
+/**
+ * Generate presigned PUT URLs for the client to upload directly to S3.
+ * Body: { action: "get-presigned-urls", sessionId, files: [{ filename, contentType }] }
+ * Returns: { urls: [{ filename, uploadUrl }] }
+ */
+async function handlePresignedUrls(body) {
+  const { sessionId, files } = body;
 
-    await s3.send(
-      new PutObjectCommand({
+  if (!sessionId || !Array.isArray(files) || files.length === 0) {
+    return respond(400, { error: "Missing sessionId or files array" });
+  }
+
+  const urls = await Promise.all(
+    files.map(async ({ filename, contentType }) => {
+      const key = `${sessionId}/${filename}`;
+      const command = new PutObjectCommand({
         Bucket: BUCKET,
         Key: key,
-        Body: buffer,
-        ContentType: contentType,
-      })
-    );
+        ContentType: contentType || "application/octet-stream",
+      });
+      const uploadUrl = await getSignedUrl(s3, command, {
+        expiresIn: PRESIGN_EXPIRY,
+      });
+      return { filename, uploadUrl, key };
+    })
+  );
 
-    return respond(200, { success: true, key });
-  } catch (err) {
-    return respond(500, { error: "Upload failed", details: err.message });
+  return respond(200, { urls });
+}
+
+/**
+ * Direct upload for small payloads (questionnaire JSON).
+ * Body: { sessionId, type: "questionnaire", data: { ... } }
+ */
+async function handleDirectUpload(body) {
+  const { sessionId, type, data } = body;
+
+  if (!sessionId || !type || !data) {
+    return respond(400, { error: "Missing sessionId, type, or data" });
   }
+
+  if (type !== "questionnaire") {
+    return respond(400, {
+      error:
+        "Direct upload only supports 'questionnaire'. Use 'get-presigned-urls' for PDFs.",
+    });
+  }
+
+  const key = `${sessionId}/questionnaire.json`;
+  const buffer = Buffer.from(JSON.stringify(data, null, 2));
+
+  await s3.send(
+    new PutObjectCommand({
+      Bucket: BUCKET,
+      Key: key,
+      Body: buffer,
+      ContentType: "application/json",
+    })
+  );
+
+  return respond(200, { success: true, key });
 }
