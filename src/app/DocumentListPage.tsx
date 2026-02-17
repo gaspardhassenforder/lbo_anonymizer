@@ -5,6 +5,7 @@ import { useStore, SavedDocumentMeta, normalizeText } from '../state/store'
 import { useModelLoader } from '../hooks/useModelLoader'
 import { DocumentCard, Document } from '../components/DocumentCard'
 import { UploadModal } from '../components/UploadModal'
+import { ShareModal } from '../components/ShareModal'
 import { loadPdf, getPdfPage } from '../pdf/pdfLoader'
 import { exportPdfAsBlob } from '../export/exportHybridPdf'
 import type { DetectedSpan, TagEntry, PageModel, RedactionRegion } from '../types'
@@ -44,6 +45,7 @@ export default function DocumentListPage() {
   const getSavedDocument = useStore((state) => state.getSavedDocument)
 
   const [isUploadModalOpen, setIsUploadModalOpen] = useState(false)
+  const [isShareModalOpen, setIsShareModalOpen] = useState(false)
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false)
   const [isLoggingOut, setIsLoggingOut] = useState(false)
 
@@ -255,6 +257,18 @@ export default function DocumentListPage() {
 
             {/* Actions */}
             <div className="flex items-center gap-3">
+              {/* Share button */}
+              <button
+                onClick={() => setIsShareModalOpen(true)}
+                disabled={savedDocuments.length === 0}
+                className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-white bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-sm font-medium"
+              >
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M7.217 10.907a2.25 2.25 0 100 2.186m0-2.186c.18.324.283.696.283 1.093s-.103.77-.283 1.093m0-2.186l9.566-5.314m-9.566 7.5l9.566 5.314m0 0a2.25 2.25 0 103.935 2.186 2.25 2.25 0 00-3.935-2.186zm0-12.814a2.25 2.25 0 103.933-2.185 2.25 2.25 0 00-3.933 2.185z" />
+                </svg>
+                {t('share.button')}
+              </button>
+
               {/* Language toggle */}
               <button
                 onClick={toggleLanguage}
@@ -352,6 +366,13 @@ export default function DocumentListPage() {
         onFileSelect={handleFileSelect}
         modelsReady={modelsReady}
         modelLoadingProgress={modelLoadingProgress}
+      />
+
+      {/* Share modal */}
+      <ShareModal
+        isOpen={isShareModalOpen}
+        onClose={() => setIsShareModalOpen(false)}
+        documents={savedDocuments}
       />
 
       {/* Logout confirmation */}

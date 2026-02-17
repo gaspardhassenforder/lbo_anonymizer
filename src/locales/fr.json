@@ -194,5 +194,25 @@
     "pageOf": "Page {{current}} / {{total}}",
     "pagesProcessed": "{{count}}/{{total}} traitées",
     "allProcessed": "Tout traité"
+  },
+  "share": {
+    "button": "Partager anonymement",
+    "title": "Partager vos documents anonymisés",
+    "subtitle": "Vos documents anonymisés seront envoyés de manière totalement anonyme pour améliorer notre outil. Aucune donnée personnelle n'est collectée.",
+    "questionUsage": "Comment utilisez-vous LBO Anonymizer ?",
+    "answerInternal": "Usage interne (due diligence)",
+    "answerExternal": "Partage avec des tiers",
+    "answerTesting": "Test / évaluation de l'outil",
+    "cancel": "Annuler",
+    "submit": "Envoyer",
+    "uploading": "Envoi du document {{current}}/{{total}}...",
+    "uploadingQuestionnaire": "Envoi du questionnaire...",
+    "successTitle": "Envoi réussi !",
+    "successMessage": "Merci pour votre contribution. Vos documents ont été partagés anonymement.",
+    "errorTitle": "Échec de l'envoi",
+    "errorMessage": "Une erreur est survenue lors de l'envoi. Veuillez réessayer.",
+    "retry": "Réessayer",
+    "close": "Fermer",
+    "tooLarge": "Le document \"{{filename}}\" est trop volumineux pour être envoyé (max 4.5 Mo)."
   }
 }

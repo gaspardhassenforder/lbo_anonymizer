@@ -194,5 +194,25 @@
     "pageOf": "Page {{current}} / {{total}}",
     "pagesProcessed": "{{count}}/{{total}} processed",
     "allProcessed": "All processed"
+  },
+  "share": {
+    "button": "Share anonymously",
+    "title": "Share your anonymized documents",
+    "subtitle": "Your anonymized documents will be sent completely anonymously to help improve our tool. No personal data is collected.",
+    "questionUsage": "How do you use LBO Anonymizer?",
+    "answerInternal": "Internal use (due diligence)",
+    "answerExternal": "Sharing with third parties",
+    "answerTesting": "Testing / evaluating the tool",
+    "cancel": "Cancel",
+    "submit": "Submit",
+    "uploading": "Uploading document {{current}}/{{total}}...",
+    "uploadingQuestionnaire": "Uploading questionnaire...",
+    "successTitle": "Upload successful!",
+    "successMessage": "Thank you for your contribution. Your documents have been shared anonymously.",
+    "errorTitle": "Upload failed",
+    "errorMessage": "An error occurred during upload. Please try again.",
+    "retry": "Retry",
+    "close": "Close",
+    "tooLarge": "The document \"{{filename}}\" is too large to upload (max 4.5 MB)."
   }
 }
