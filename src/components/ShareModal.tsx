@@ -21,7 +21,7 @@ interface ShareModalProps {
 export function ShareModal({ isOpen, onClose, documents }: ShareModalProps) {
   const { t } = useTranslation()
   const [phase, setPhase] = useState<Phase>('questionnaire')
-  const [answers, setAnswers] = useState<Record<string, string>>({})
+  const [answers, setAnswers] = useState<Record<string, string | string[]>>({})
   const [uploadCurrent, setUploadCurrent] = useState(0)
   const [uploadTotal, setUploadTotal] = useState(0)
   const [error, setError] = useState<string | null>(null)
@@ -205,7 +205,7 @@ export function ShareModal({ isOpen, onClose, documents }: ShareModalProps) {
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm"
       onClick={handleBackdropClick}
     >
-      <div className="relative w-full max-w-lg mx-4 bg-white rounded-2xl shadow-2xl">
+      <div className="relative w-full max-w-xl mx-4 bg-white rounded-2xl shadow-2xl">
         {/* Close button (hidden during upload) */}
         {phase !== 'uploading' && (
           <button
@@ -232,37 +232,118 @@ export function ShareModal({ isOpen, onClose, documents }: ShareModalProps) {
             </div>
             <p className="text-sm text-slate-500 mb-6">{t('share.subtitle')}</p>
 
-            {/* Question: Usage */}
-            <div className="mb-6">
-              <p className="text-sm font-medium text-slate-700 mb-3">{t('share.questionUsage')}</p>
-              <div className="space-y-2">
-                {(['internal', 'external', 'testing'] as const).map((value) => (
-                  <label
-                    key={value}
-                    className={`flex items-center gap-3 p-3 rounded-lg border cursor-pointer transition-colors ${
-                      answers.usage === value
-                        ? 'border-emerald-500 bg-emerald-50'
-                        : 'border-slate-200 hover:border-slate-300'
-                    }`}
-                  >
-                    <input
-                      type="radio"
-                      name="usage"
-                      value={value}
-                      checked={answers.usage === value}
-                      onChange={() => setAnswers((prev) => ({ ...prev, usage: value }))}
-                      className="accent-emerald-600"
-                    />
-                    <span className="text-sm text-slate-700">
-                      {t(`share.answer${value.charAt(0).toUpperCase() + value.slice(1)}`)}
-                    </span>
-                  </label>
-                ))}
+            <div className="space-y-5 max-h-[60vh] overflow-y-auto pr-1">
+              {/* Question 1: Investment type (majo/mino) */}
+              <div>
+                <p className="text-sm font-medium text-slate-700 mb-2">{t('share.questionInvestmentType')}</p>
+                <div className="flex gap-2">
+                  {(['majo', 'mino'] as const).map((value) => (
+                    <label
+                      key={value}
+                      className={`flex items-center gap-2 px-4 py-2 rounded-lg border cursor-pointer transition-colors ${
+                        answers.investmentType === value
+                          ? 'border-emerald-500 bg-emerald-50'
+                          : 'border-slate-200 hover:border-slate-300'
+                      }`}
+                    >
+                      <input
+                        type="radio"
+                        name="investmentType"
+                        value={value}
+                        checked={answers.investmentType === value}
+                        onChange={() => setAnswers((prev) => ({ ...prev, investmentType: value }))}
+                        className="accent-emerald-600"
+                      />
+                      <span className="text-sm text-slate-700">
+                        {t(`share.answer${value.charAt(0).toUpperCase() + value.slice(1)}`)}
+                      </span>
+                    </label>
+                  ))}
+                </div>
+              </div>
+
+              {/* Question 2: LBO number (number input) */}
+              <div>
+                <p className="text-sm font-medium text-slate-700 mb-2">{t('share.questionLboNumber')}</p>
+                <input
+                  type="number"
+                  min={1}
+                  value={(answers.lboNumber as string) || ''}
+                  onChange={(e) => setAnswers((prev) => ({ ...prev, lboNumber: e.target.value }))}
+                  placeholder={t('share.lboNumberPlaceholder')}
+                  className="w-32 px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
+                />
+              </div>
+
+              {/* Question 3: Valuation range */}
+              <div>
+                <p className="text-sm font-medium text-slate-700 mb-2">{t('share.questionValuation')}</p>
+                <div className="flex flex-wrap gap-2">
+                  {(['0_50', '50_250', '250_500', '500_1000', '1000plus'] as const).map((value) => (
+                    <label
+                      key={value}
+                      className={`flex items-center gap-2 px-3 py-2 rounded-lg border cursor-pointer transition-colors text-sm ${
+                        answers.valuation === value
+                          ? 'border-emerald-500 bg-emerald-50'
+                          : 'border-slate-200 hover:border-slate-300'
+                      }`}
+                    >
+                      <input
+                        type="radio"
+                        name="valuation"
+                        value={value}
+                        checked={answers.valuation === value}
+                        onChange={() => setAnswers((prev) => ({ ...prev, valuation: value }))}
+                        className="accent-emerald-600"
+                      />
+                      <span className="text-slate-700">{t(`share.answerValuation${value}`)}</span>
+                    </label>
+                  ))}
+                </div>
+              </div>
+
+              {/* Question 4: Sector (multi-select checkboxes) */}
+              <div>
+                <p className="text-sm font-medium text-slate-700 mb-2">{t('share.questionSector')}</p>
+                <div className="grid grid-cols-2 gap-2">
+                  {([
+                    'BusinessServices', 'IT', 'Industry', 'Health', 'Retail',
+                    'Food', 'Construction', 'Transport', 'Hospitality', 'Education',
+                  ] as const).map((value) => {
+                    const selected = Array.isArray(answers.sectors) && answers.sectors.includes(value)
+                    return (
+                      <label
+                        key={value}
+                        className={`flex items-center gap-2 px-3 py-2 rounded-lg border cursor-pointer transition-colors text-sm ${
+                          selected
+                            ? 'border-emerald-500 bg-emerald-50'
+                            : 'border-slate-200 hover:border-slate-300'
+                        }`}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={selected}
+                          onChange={() =>
+                            setAnswers((prev) => {
+                              const current = Array.isArray(prev.sectors) ? prev.sectors : []
+                              const next = selected
+                                ? current.filter((s) => s !== value)
+                                : [...current, value]
+                              return { ...prev, sectors: next }
+                            })
+                          }
+                          className="accent-emerald-600"
+                        />
+                        <span className="text-slate-700">{t(`share.sector${value}`)}</span>
+                      </label>
+                    )
+                  })}
+                </div>
               </div>
             </div>
 
             {/* Actions */}
-            <div className="flex justify-end gap-3">
+            <div className="flex justify-end gap-3 mt-6">
               <button
                 onClick={onClose}
                 className="px-4 py-2 text-sm font-medium text-slate-600 hover:text-slate-800 hover:bg-slate-100 rounded-lg transition-colors"
