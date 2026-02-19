@@ -1,4 +1,4 @@
-import { useState, FormEvent, useEffect } from 'react'
+import { useState, useEffect } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { useStore } from '../state/store'
@@ -8,9 +8,6 @@ export default function LoginPage() {
   const navigate = useNavigate()
   const location = useLocation()
 
-  const [username, setUsername] = useState('')
-  const [password, setPassword] = useState('')
-  const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
 
   const storeLogin = useStore((state) => state.login)
@@ -26,27 +23,18 @@ export default function LoginPage() {
     }
   }, [isAuthenticated, navigate, from])
 
-  const handleSubmit = (e: FormEvent) => {
-    e.preventDefault()
-    setError('')
+  const handleConnect = () => {
     setLoading(true)
 
-    // Hardcoded login - browser only mode
-    if (username === 'admin' && password === 'admin') {
-      // Generate a dummy token for the session
-      const token = btoa(JSON.stringify({
-        userId: 1,
-        username: 'admin',
-        exp: Date.now() + 24 * 60 * 60 * 1000 // 24 hours
-      }))
+    // Auto-login with a session token (no credentials needed for beta)
+    const token = btoa(JSON.stringify({
+      userId: 1,
+      username: 'admin',
+      exp: Date.now() + 24 * 60 * 60 * 1000 // 24 hours
+    }))
 
-      storeLogin({ id: 1, username: 'admin' }, token)
-      navigate(from, { replace: true })
-    } else {
-      setError(t('login.error'))
-    }
-
-    setLoading(false)
+    storeLogin({ id: 1, username: 'admin' }, token)
+    navigate(from, { replace: true })
   }
 
   const toggleLanguage = () => {
@@ -80,76 +68,63 @@ export default function LoginPage() {
             <p className="text-slate-500">{t('login.subtitle')}</p>
           </div>
 
-          {/* Login form */}
+          {/* Welcome card */}
           <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-6">
-            <h2 className="text-xl font-semibold text-slate-800 mb-6">{t('login.title')}</h2>
+            <h2 className="text-xl font-semibold text-slate-800 mb-4">{t('login.title')}</h2>
 
-            <form onSubmit={handleSubmit} className="space-y-4">
-              {error && (
-                <div className="p-3 rounded-lg bg-red-50 border border-red-200 text-red-700 text-sm">
-                  {error}
+            {/* Privacy reassurance */}
+            <div className="mb-6 p-4 rounded-lg bg-emerald-50 border border-emerald-200">
+              <div className="flex items-start gap-3">
+                <svg className="w-5 h-5 text-emerald-600 mt-0.5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75L11.25 15 15 9.75m-3-7.036A11.959 11.959 0 013.598 6 11.99 11.99 0 003 9.749c0 5.592 3.824 10.29 9 11.623 5.176-1.332 9-6.03 9-11.622 0-1.31-.21-2.571-.598-3.751h-.152c-3.196 0-6.1-1.248-8.25-3.285z" />
+                </svg>
+                <div>
+                  <p className="font-medium text-emerald-800 mb-1">{t('login.privacyHeading')}</p>
+                  <p className="text-sm text-emerald-700 leading-relaxed">{t('login.privacyText')}</p>
                 </div>
-              )}
-
-              <div>
-                <label htmlFor="username" className="block text-sm font-medium text-slate-700 mb-1">
-                  {t('login.username')}
-                </label>
-                <input
-                  type="text"
-                  id="username"
-                  value={username}
-                  onChange={(e) => setUsername(e.target.value)}
-                  className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none transition-colors"
-                  placeholder={t('login.usernamePlaceholder')}
-                  required
-                  autoComplete="username"
-                  disabled={loading}
-                />
               </div>
-
-              <div>
-                <label htmlFor="password" className="block text-sm font-medium text-slate-700 mb-1">
-                  {t('login.password')}
-                </label>
-                <input
-                  type="password"
-                  id="password"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none transition-colors"
-                  placeholder={t('login.passwordPlaceholder')}
-                  required
-                  autoComplete="current-password"
-                  disabled={loading}
-                />
-              </div>
-
-              <button
-                type="submit"
-                disabled={loading}
-                className="w-full py-2.5 px-4 bg-primary-600 text-white font-medium rounded-lg hover:bg-primary-700 focus:ring-2 focus:ring-primary-500 focus:ring-offset-2 outline-none transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                {loading ? (
-                  <span className="inline-flex items-center gap-2">
-                    <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24">
-                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
-                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
-                    </svg>
-                    {t('login.loggingIn')}
-                  </span>
-                ) : (
-                  t('login.submit')
-                )}
-              </button>
-            </form>
-
-            {/* Demo credentials hint */}
-            <div className="mt-6 p-3 rounded-lg bg-slate-50 border border-slate-200">
-              <p className="text-xs text-slate-500 text-center">
-                {t('login.demoHint')}
-              </p>
             </div>
+
+            {/* Bullet points */}
+            <ul className="space-y-3 mb-6">
+              <li className="flex items-center gap-3 text-sm text-slate-600">
+                <svg className="w-4 h-4 text-primary-600 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M9 17.25v1.007a3 3 0 01-.879 2.122L7.5 21h9l-.621-.621A3 3 0 0115 18.257V17.25m6-12V15a2.25 2.25 0 01-2.25 2.25H5.25A2.25 2.25 0 013 15V5.25A2.25 2.25 0 015.25 3h13.5A2.25 2.25 0 0121 5.25z" />
+                </svg>
+                {t('login.bulletLocal')}
+              </li>
+              <li className="flex items-center gap-3 text-sm text-slate-600">
+                <svg className="w-4 h-4 text-primary-600 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M16.5 10.5V6.75a4.5 4.5 0 10-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 002.25-2.25v-6.75a2.25 2.25 0 00-2.25-2.25H6.75a2.25 2.25 0 00-2.25 2.25v6.75a2.25 2.25 0 002.25 2.25z" />
+                </svg>
+                {t('login.bulletNoUpload')}
+              </li>
+              <li className="flex items-center gap-3 text-sm text-slate-600">
+                <svg className="w-4 h-4 text-primary-600 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 6a3.75 3.75 0 11-7.5 0 3.75 3.75 0 017.5 0zM4.501 20.118a7.5 7.5 0 0114.998 0A17.933 17.933 0 0112 21.75c-2.676 0-5.216-.584-7.499-1.632z" />
+                </svg>
+                {t('login.bulletNoAccount')}
+              </li>
+            </ul>
+
+            {/* Connect button */}
+            <button
+              onClick={handleConnect}
+              disabled={loading}
+              className="w-full py-3 px-4 bg-primary-600 text-white font-medium rounded-lg hover:bg-primary-700 focus:ring-2 focus:ring-primary-500 focus:ring-offset-2 outline-none transition-colors disabled:opacity-50 disabled:cursor-not-allowed text-base"
+            >
+              {loading ? (
+                <span className="inline-flex items-center gap-2">
+                  <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                  </svg>
+                  {t('login.loggingIn')}
+                </span>
+              ) : (
+                t('login.submit')
+              )}
+            </button>
           </div>
         </div>
       </div>

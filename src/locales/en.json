@@ -4,16 +4,15 @@
     "subtitle": "Protect sensitive data in your confidential documents"
   },
   "login": {
-    "title": "Sign In",
-    "subtitle": "Sign in to access your documents",
-    "username": "Username",
-    "usernamePlaceholder": "Enter your username",
-    "password": "Password",
-    "passwordPlaceholder": "Enter your password",
-    "submit": "Sign In",
-    "loggingIn": "Signing in...",
-    "error": "Invalid username or password",
-    "demoHint": "Demo credentials: admin / admin"
+    "title": "Welcome",
+    "subtitle": "Protect sensitive data in your confidential documents",
+    "submit": "Access the tool",
+    "loggingIn": "Loading...",
+    "privacyHeading": "Your documents stay private",
+    "privacyText": "This tool works entirely on your computer. Your files are never sent anywhere unless you explicitly choose to share them. Everything happens right here, in your browser.",
+    "bulletLocal": "Works offline, directly in your browser",
+    "bulletNoUpload": "Your files never leave your computer without your consent",
+    "bulletNoAccount": "No account or personal information needed"
   },
   "landing": {
     "badge": "Your files stay on your computer",

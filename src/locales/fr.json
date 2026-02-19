@@ -4,16 +4,15 @@
     "subtitle": "Protégez les données sensibles de vos documents confidentiels"
   },
   "login": {
-    "title": "Connexion",
-    "subtitle": "Connectez-vous pour accéder a vos documents",
-    "username": "Nom d'utilisateur",
-    "usernamePlaceholder": "Entrez votre nom d'utilisateur",
-    "password": "Mot de passe",
-    "passwordPlaceholder": "Entrez votre mot de passe",
-    "submit": "Se connecter",
-    "loggingIn": "Connexion en cours...",
-    "error": "Nom d'utilisateur ou mot de passe invalide",
-    "demoHint": "Identifiants demo : admin / admin"
+    "title": "Bienvenue",
+    "subtitle": "Protégez les données sensibles de vos documents confidentiels",
+    "submit": "Accéder à l'outil",
+    "loggingIn": "Chargement...",
+    "privacyHeading": "Vos documents restent privés",
+    "privacyText": "Cet outil fonctionne entièrement sur votre ordinateur. Vos fichiers ne sont jamais envoyés sauf si vous choisissez explicitement de les partager. Tout se passe ici, dans votre navigateur.",
+    "bulletLocal": "Fonctionne hors ligne, directement dans votre navigateur",
+    "bulletNoUpload": "Vos fichiers ne quittent jamais votre ordinateur sans votre accord",
+    "bulletNoAccount": "Aucun compte ni information personnelle requis"
   },
   "landing": {
     "badge": "Vos fichiers restent sur votre ordinateur",
