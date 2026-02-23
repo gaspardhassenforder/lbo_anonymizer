@@ -279,7 +279,7 @@ export function ShareModal({ isOpen, onClose, documents }: ShareModalProps) {
               <div>
                 <p className="text-sm font-medium text-slate-700 mb-2">{t('share.questionValuation')}</p>
                 <div className="flex flex-wrap gap-2">
-                  {(['0_50', '50_250', '250_500', '500_1000', '1000plus'] as const).map((value) => (
+                  {(['0_50', '50_100', '100_250', '250_500', '500_1000', '1000plus'] as const).map((value) => (
                     <label
                       key={value}
                       className={`flex items-center gap-2 px-3 py-2 rounded-lg border cursor-pointer transition-colors text-sm ${
@@ -307,8 +307,8 @@ export function ShareModal({ isOpen, onClose, documents }: ShareModalProps) {
                 <p className="text-sm font-medium text-slate-700 mb-2">{t('share.questionSector')}</p>
                 <div className="grid grid-cols-2 gap-2">
                   {([
-                    'BusinessServices', 'IT', 'Industry', 'Health', 'Retail',
-                    'Food', 'Construction', 'Transport', 'Hospitality', 'Education',
+                    'ConsumerGoods', 'Construction', 'Digital', 'Education',
+                    'Health', 'BusinessServices', 'FinancialServices', 'Other',
                   ] as const).map((value) => {
                     const selected = Array.isArray(answers.sectors) && answers.sectors.includes(value)
                     return (
