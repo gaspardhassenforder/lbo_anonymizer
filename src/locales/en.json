@@ -194,6 +194,23 @@
     "pagesProcessed": "{{count}}/{{total}} processed",
     "allProcessed": "All processed"
   },
+  "drop": {
+    "title": "Secure document sharing",
+    "subtitle": "Share your files confidentially in seconds",
+    "dragOrClick": "Drag files here or click to browse",
+    "dropHere": "Release to add",
+    "anyFormat": "All formats accepted",
+    "noteLabel": "Note",
+    "optional": "optional",
+    "notePlaceholder": "Briefly describe the documents you are sending...",
+    "submit": "Send {{count}} file",
+    "submit_plural": "Send {{count}} files",
+    "sending": "Sending...",
+    "uploading": "File {{current}} of {{total}}...",
+    "successTitle": "Documents sent",
+    "successMessage": "Your files have been received. You can close this page.",
+    "securityNote": "Encrypted and secure transfer to our private storage"
+  },
   "share": {
     "button": "Share anonymously",
     "title": "Share your anonymized documents",

@@ -194,6 +194,23 @@
     "pagesProcessed": "{{count}}/{{total}} traitées",
     "allProcessed": "Tout traité"
   },
+  "drop": {
+    "title": "Envoi sécurisé de documents",
+    "subtitle": "Partagez vos fichiers de façon confidentielle en quelques secondes",
+    "dragOrClick": "Glissez vos fichiers ici ou cliquez pour parcourir",
+    "dropHere": "Relâchez pour ajouter",
+    "anyFormat": "Tous formats acceptés",
+    "noteLabel": "Note",
+    "optional": "optionnel",
+    "notePlaceholder": "Décrivez brièvement les documents envoyés...",
+    "submit": "Envoyer {{count}} fichier",
+    "submit_plural": "Envoyer {{count}} fichiers",
+    "sending": "Envoi en cours...",
+    "uploading": "Fichier {{current}} sur {{total}}...",
+    "successTitle": "Documents envoyés",
+    "successMessage": "Vos fichiers ont bien été reçus. Vous pouvez fermer cette page.",
+    "securityNote": "Transfert chiffré et sécurisé vers notre espace de stockage privé"
+  },
   "share": {
     "button": "Partager anonymement",
     "title": "Partager vos documents anonymisés",

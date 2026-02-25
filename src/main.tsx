@@ -6,6 +6,7 @@ import OCRView from './app/OCRView'
 import LoginPage from './app/LoginPage'
 import DocumentListPage from './app/DocumentListPage'
 import ProtectedRoute from './app/ProtectedRoute'
+import DropPage from './app/DropPage'
 import './i18n'
 import './index.css'
 
@@ -14,6 +15,11 @@ const router = createBrowserRouter([
   {
     path: '/login',
     element: <LoginPage />,
+  },
+  // Public route - secure file drop (no auth required)
+  {
+    path: '/drop',
+    element: <DropPage />,
   },
   // Root path redirects to documents
   {
