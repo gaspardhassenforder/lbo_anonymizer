@@ -198,7 +198,7 @@
     "button": "Partager anonymement",
     "title": "Partager vos documents anonymisés",
     "subtitle": "Vos documents anonymisés seront envoyés de manière totalement anonyme pour améliorer notre outil. Aucune donnée personnelle n'est collectée.",
-    "questionInvestmentType": "Type d'investissement",
+    "questionInvestmentType": "L'actionnaire financier est",
     "answerMajo": "Majoritaire",
     "answerMino": "Minoritaire",
     "questionLboNumber": "Numéro de LBO",

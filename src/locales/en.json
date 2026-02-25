@@ -198,7 +198,7 @@
     "button": "Share anonymously",
     "title": "Share your anonymized documents",
     "subtitle": "Your anonymized documents will be sent completely anonymously to help improve our tool. No personal data is collected.",
-    "questionInvestmentType": "Investment type",
+    "questionInvestmentType": "The financial shareholder is",
     "answerMajo": "Majority",
     "answerMino": "Minority",
     "questionLboNumber": "LBO number",
