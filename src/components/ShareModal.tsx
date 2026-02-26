@@ -10,18 +10,21 @@ import { normalizeEntityLabel } from '../types'
 
 const FUNCTION_URL = 'https://lbouploadovxwraxy-pdf-upload.functions.fnc.fr-par.scw.cloud'
 
-type Phase = 'questionnaire' | 'uploading' | 'result'
+type Phase = 'filename_review' | 'questionnaire' | 'feedback' | 'uploading' | 'result'
 
 interface ShareModalProps {
   isOpen: boolean
   onClose: () => void
   documents: SavedDocumentMeta[]
+  onRenameDocument?: (docId: string, newFilename: string) => void
 }
 
-export function ShareModal({ isOpen, onClose, documents }: ShareModalProps) {
+export function ShareModal({ isOpen, onClose, documents, onRenameDocument }: ShareModalProps) {
   const { t } = useTranslation()
-  const [phase, setPhase] = useState<Phase>('questionnaire')
+  const [phase, setPhase] = useState<Phase>('filename_review')
   const [answers, setAnswers] = useState<Record<string, string | string[]>>({})
+  const [editedFilenames, setEditedFilenames] = useState<Record<string, string>>({})
+  const [feedbackText, setFeedbackText] = useState('')
   const [uploadCurrent, setUploadCurrent] = useState(0)
   const [uploadTotal, setUploadTotal] = useState(0)
   const [error, setError] = useState<string | null>(null)
@@ -29,8 +32,10 @@ export function ShareModal({ isOpen, onClose, documents }: ShareModalProps) {
   // Reset state when modal opens
   useEffect(() => {
     if (isOpen) {
-      setPhase('questionnaire')
+      setPhase('filename_review')
+      setEditedFilenames(Object.fromEntries(documents.map(d => [d.id, d.filename])))
       setAnswers({})
+      setFeedbackText('')
       setUploadCurrent(0)
       setUploadTotal(0)
       setError(null)
@@ -54,6 +59,16 @@ export function ShareModal({ isOpen, onClose, documents }: ShareModalProps) {
     },
     [phase, onClose]
   )
+
+  const handleFilenameReviewContinue = useCallback(() => {
+    documents.forEach(doc => {
+      const edited = editedFilenames[doc.id]
+      if (edited && edited.trim() && edited.trim() !== doc.filename) {
+        onRenameDocument?.(doc.id, edited.trim())
+      }
+    })
+    setPhase('questionnaire')
+  }, [documents, editedFilenames, onRenameDocument])
 
   const handleSubmit = useCallback(async () => {
     setPhase('uploading')
@@ -130,7 +145,8 @@ export function ShareModal({ isOpen, onClose, documents }: ShareModalProps) {
         })
 
         const anonymizedBlob = await exportPdfAsBlob(pdfDoc, pageModels, entities, tagMap, regions)
-        const filename = doc.filename.replace(/\.pdf$/i, '_anonymized.pdf')
+        const base = (editedFilenames[doc.id] || doc.filename).replace(/\.pdf$/i, '').replace(/_anonymized$/i, '')
+        const filename = `${base}_anonymized.pdf`
         generatedFiles.push({ filename, blob: anonymizedBlob })
       }
 
@@ -182,6 +198,7 @@ export function ShareModal({ isOpen, onClose, documents }: ShareModalProps) {
           data: {
             submittedAt: new Date().toISOString(),
             answers,
+            feedback: feedbackText.trim() || null,
           },
         }),
       })
@@ -196,7 +213,7 @@ export function ShareModal({ isOpen, onClose, documents }: ShareModalProps) {
       setPhase('result')
       setError(err instanceof Error ? err.message : 'Unknown error')
     }
-  }, [documents, answers, t])
+  }, [documents, answers, feedbackText, editedFilenames])
 
   if (!isOpen) return null
 
@@ -216,6 +233,68 @@ export function ShareModal({ isOpen, onClose, documents }: ShareModalProps) {
               <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
             </svg>
           </button>
+        )}
+
+        {/* ── Filename review phase ── */}
+        {phase === 'filename_review' && (
+          <div className="px-8 py-8">
+            {/* Header */}
+            <div className="flex items-center gap-3 mb-4">
+              <div className="p-2 rounded-xl bg-amber-100">
+                <svg className="w-6 h-6 text-amber-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z" />
+                </svg>
+              </div>
+              <h2 className="text-xl font-bold text-slate-800">{t('share.reviewFilenamesTitle')}</h2>
+            </div>
+
+            {/* Warning banner */}
+            <div className="mb-4 p-3 rounded-lg bg-amber-50 border border-amber-200">
+              <p className="text-sm text-amber-800">{t('share.reviewFilenamesWarning')}</p>
+            </div>
+
+            <p className="text-sm text-slate-600 mb-4">{t('share.reviewFilenamesSubtitle')}</p>
+
+            {/* Document list */}
+            <div className="space-y-2 max-h-[40vh] overflow-y-auto pr-1">
+              {documents.map(doc => {
+                const full = editedFilenames[doc.id] ?? doc.filename
+                const base = full.replace(/\.pdf$/i, '')
+                return (
+                  <div key={doc.id} className="flex items-center gap-2">
+                    <svg className="w-4 h-4 text-slate-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m0 12.75h7.5m-7.5 3H12M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z" />
+                    </svg>
+                    <div className="flex flex-1 items-center border border-slate-200 rounded-lg focus-within:ring-2 focus-within:ring-amber-400 focus-within:border-amber-400 overflow-hidden">
+                      <input
+                        type="text"
+                        value={base}
+                        onChange={e => setEditedFilenames(prev => ({ ...prev, [doc.id]: e.target.value + '.pdf' }))}
+                        className="flex-1 px-3 py-2 text-sm focus:outline-none"
+                      />
+                      <span className="px-3 py-2 text-sm text-slate-400 bg-slate-50 border-l border-slate-200 select-none">.pdf</span>
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+
+            {/* Actions */}
+            <div className="flex justify-end gap-3 mt-6">
+              <button
+                onClick={onClose}
+                className="px-4 py-2 text-sm font-medium text-slate-600 hover:text-slate-800 hover:bg-slate-100 rounded-lg transition-colors"
+              >
+                {t('share.cancel')}
+              </button>
+              <button
+                onClick={handleFilenameReviewContinue}
+                className="px-4 py-2 text-sm font-medium text-white bg-emerald-600 hover:bg-emerald-700 rounded-lg shadow-sm transition-colors"
+              >
+                {t('share.continue')} →
+              </button>
+            </div>
+          </div>
         )}
 
         {/* ── Questionnaire phase ── */}
@@ -349,6 +428,46 @@ export function ShareModal({ isOpen, onClose, documents }: ShareModalProps) {
                 className="px-4 py-2 text-sm font-medium text-slate-600 hover:text-slate-800 hover:bg-slate-100 rounded-lg transition-colors"
               >
                 {t('share.cancel')}
+              </button>
+              <button
+                onClick={() => setPhase('feedback')}
+                className="px-4 py-2 text-sm font-medium text-white bg-emerald-600 hover:bg-emerald-700 rounded-lg shadow-sm transition-colors"
+              >
+                {t('share.continue')} →
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* ── Feedback phase ── */}
+        {phase === 'feedback' && (
+          <div className="px-8 py-8">
+            {/* Header */}
+            <div className="flex items-center gap-3 mb-2">
+              <div className="p-2 rounded-xl bg-emerald-100">
+                <svg className="w-6 h-6 text-emerald-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M7.5 8.25h9m-9 3H12m-9.75 1.51c0 1.6 1.123 2.994 2.707 3.227 1.129.166 2.27.293 3.423.379.35.026.67.21.865.501L12 21l2.755-4.133a1.14 1.14 0 01.865-.501 48.172 48.172 0 003.423-.379c1.584-.233 2.707-1.626 2.707-3.228V6.741c0-1.602-1.123-2.995-2.707-3.228A48.394 48.394 0 0012 3c-2.392 0-4.744.175-7.043.513C3.373 3.746 2.25 5.14 2.25 6.741v6.018z" />
+                </svg>
+              </div>
+              <h2 className="text-xl font-bold text-slate-800">{t('share.feedbackTitle')}</h2>
+            </div>
+            <p className="text-sm text-slate-500 mb-6">{t('share.feedbackSubtitle')}</p>
+
+            <textarea
+              value={feedbackText}
+              onChange={e => setFeedbackText(e.target.value)}
+              placeholder={t('share.feedbackPlaceholder')}
+              rows={5}
+              className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 resize-none"
+            />
+
+            {/* Actions */}
+            <div className="flex justify-end gap-3 mt-6">
+              <button
+                onClick={() => setPhase('questionnaire')}
+                className="px-4 py-2 text-sm font-medium text-slate-600 hover:text-slate-800 hover:bg-slate-100 rounded-lg transition-colors"
+              >
+                {t('share.back')}
               </button>
               <button
                 onClick={handleSubmit}

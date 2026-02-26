@@ -236,6 +236,11 @@ export default function DocumentListPage() {
     }
   }, [getSavedDocument, updateSavedDocument, t])
 
+  const handleRenameById = useCallback((docId: string, newFilename: string) => {
+    const doc = savedDocuments.find(d => d.id === docId)
+    if (doc) void handleRenameDocument(toDocument(doc), newFilename)
+  }, [savedDocuments, handleRenameDocument])
+
   const toggleLanguage = () => {
     const newLang = i18n.language === 'fr' ? 'en' : 'fr'
     i18n.changeLanguage(newLang)
@@ -373,6 +378,7 @@ export default function DocumentListPage() {
         isOpen={isShareModalOpen}
         onClose={() => setIsShareModalOpen(false)}
         documents={savedDocuments}
+        onRenameDocument={handleRenameById}
       />
 
       {/* Logout confirmation */}
