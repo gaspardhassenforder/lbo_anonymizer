@@ -103,7 +103,17 @@ export function ShareModal({ isOpen, onClose, documents, onRenameDocument }: Sha
         try {
           const storedPages = JSON.parse(savedData.pagesJson || '[]')
           if (Array.isArray(storedPages) && storedPages.length > 0) {
-            pageModels = storedPages as PageModel[]
+            // Only keep pages whose pageIndex is within range of the loaded PDF
+            const validPages = (storedPages as PageModel[]).filter(
+              (p) => typeof p.pageIndex === 'number' && p.pageIndex >= 0 && p.pageIndex < numPages
+            )
+            if (validPages.length !== storedPages.length) {
+              console.warn(
+                `[ShareModal] ${doc.filename}: stored ${storedPages.length} page models but PDF has ${numPages} pages. ` +
+                `Page indices: [${(storedPages as PageModel[]).map((p) => p.pageIndex).join(', ')}]. Kept ${validPages.length}.`
+              )
+            }
+            pageModels = validPages
           }
         } catch {
           // ignore
