@@ -195,6 +195,13 @@ export default function App() {
     if (file) return // Already have a file
     if (pages.length === 0) return // No persisted state to restore
 
+    // Skip restoration if a document is being loaded via URL param or navigation state —
+    // those flows call reset() + load the correct document themselves.
+    // Without this guard, restorePdfFromStorage races with loadDocumentFromStore /
+    // processFile and can overwrite the new document's state with stale sessionStorage data.
+    if (searchParams.get('documentId')) return
+    if ((location.state as { file?: File } | null)?.file) return
+
     hasTriedRestore.current = true
 
     const restorePdfFromStorage = async () => {
@@ -202,6 +209,12 @@ export default function App() {
       try {
         const stored = await loadStoredPdf()
         if (stored) {
+          // Re-check: another effect may have set a file while we awaited IndexedDB
+          if (useStore.getState().file) {
+            console.log('[App] Skipping PDF restore — file already set by another effect')
+            return
+          }
+
           console.log('[App] Restoring PDF from IndexedDB:', stored.filename)
 
           // Convert ArrayBuffer to File
@@ -229,7 +242,7 @@ export default function App() {
     }
 
     restorePdfFromStorage()
-  }, [file, pages.length, setFile, setProcessing, reset])
+  }, [file, pages.length, searchParams, location.state, setFile, setProcessing, reset])
 
   // Load document from saved documents when documentId is in URL
   useEffect(() => {
