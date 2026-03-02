@@ -32,6 +32,12 @@ function normalizeText(text: string): string {
   return text.trim().toLowerCase().replace(/\s+/g, ' ')
 }
 
+// Format text: show first 22 + "…" + last 10 chars when longer than 32
+function formatDisplayText(text: string): string {
+  if (text.length <= 32) return text
+  return text.slice(0, 22) + '…' + text.slice(-10)
+}
+
 // Format page indices as p2,4,5,7 (1-based), max 5 then "..."
 function formatPageList(spans: DetectedSpan[], maxPages = 5): string {
   const pages = [...new Set(spans.map((s) => s.pageIndex + 1))].sort((a, b) => a - b)
@@ -463,8 +469,8 @@ export function Sidebar({
                       <div className="flex items-start justify-between gap-3">
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-2">
-                            <p className="text-sm text-slate-800 truncate font-medium" title={group.displayText}>
-                              {group.displayText}
+                            <p className="text-sm text-slate-800 font-medium" title={group.displayText}>
+                              {formatDisplayText(group.displayText)}
                             </p>
                             {group.spans.length > 1 && (
                               <span className="px-1.5 py-0.5 rounded bg-slate-100 text-xs text-slate-500 shrink-0">
