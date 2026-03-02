@@ -122,7 +122,7 @@ export default function App() {
 
         setSavedDocuments(metas)
         setCorpusRules({
-          suppressedTexts: new Set([...getKnownFalsePositiveTexts(), ...rules.suppressedTexts]),
+          suppressedTexts: new Set(rules.suppressedTexts),
           labelOverrides: new Map(
             rules.labelOverrides.map(([k, v]) => [k, normalizeEntityLabel(v as string)])
           ),
@@ -466,7 +466,7 @@ export default function App() {
         },
       }, () => ({
         // Return current user decisions for each page processing
-        suppressedTexts: useStore.getState().suppressedTexts,
+        suppressedTexts: new Set([...getKnownFalsePositiveTexts(), ...useStore.getState().suppressedTexts]),
         labelOverrides: useStore.getState().labelOverrides,
         forcedLabels: useStore.getState().forcedLabels,
       }))
