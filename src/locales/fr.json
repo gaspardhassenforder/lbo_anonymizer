@@ -41,7 +41,11 @@
     "newFile": "Nouveau fichier",
     "confirmAnonymisation": "Confirmer",
     "confirmDisabledHint": "{{count}}/{{total}} pages traitées. Veuillez attendre que toutes les pages soient traitées avant de confirmer.",
-    "previewAnonymized": "Aperçu"
+    "previewAnonymized": "Aperçu",
+    "boxSelectMode": "Dessiner une zone"
+  },
+  "boxSelection": {
+    "label": "Zone manuelle"
   },
   "documents": {
     "title": "Vos Documents",
@@ -77,7 +81,9 @@
     "noEntities": "Aucune entité détectée",
     "noEntitiesHint": "Essayez de baisser le niveau de certitude",
     "tagMapping": "Correspondance des tags",
-    "moreItems": "+{{count}} de plus..."
+    "moreItems": "+{{count}} de plus...",
+    "regions": "Zones",
+    "signatureArea": "Zone de signature"
   },
   "processing": {
     "loadingPdf": "Chargement du document",
@@ -175,6 +181,19 @@
     "editTitle": "Modifier ou supprimer",
     "editDesc": "Cliquez sur un mot surligné pour ouvrir son panneau. Changez la catégorie ou supprimez-le. Vous pouvez appliquer le changement à cette seule occurrence, à tout le document, ou à tous vos documents.",
     "scopeNote": "Conseil : lorsqu’on vous demande la portée, « cette instance » ne touche que le mot sélectionné, « tout le document » reprend toutes les occurrences identiques, et « tous les documents » applique la règle à l’ensemble de vos documents.",
+    "drawRegionTitle": "Dessiner une zone",
+    "drawRegionBadge": "Pour les éléments non textuels",
+    "drawRegionDesc": "L’IA ne détecte que le texte. Si votre document contient des signatures, tampons, logos, photos ou annotations manuscrites à masquer, utilisez le mode « Dessiner une zone ». Cliquez sur le bouton à tirets dans la barre d’outils, puis cliquez-glissez directement sur la page pour entourer la zone. Un sélecteur de catégorie apparaît — choisissez n’importe quel type. Le rectangle entier sera noirci dans le PDF exporté.",
+    "drawRegionTips": [
+      "Pas besoin d’être précis au pixel — toute la zone est couverte.",
+      "Fonctionne sur n’importe quel contenu : signatures, tampons, photos, graphiques, texte manuscrit.",
+      "Les zones s’appliquent uniquement à cet emplacement précis sur cette page — elles ne créent pas de règle sur tout le document.",
+      "Si vous dessinez une zone par erreur, supprimez-la depuis le panneau de gauche ou cliquez dessus sur la page et choisissez Supprimer.",
+      "Vous pouvez dessiner des zones même après que l’IA a terminé son analyse — pas besoin de relancer le traitement."
+    ],
+    "subtitlePage2": "Masquer les éléments non textuels",
+    "next": "Suivant",
+    "back": "Retour",
     "dontShowAgain": "Ne plus afficher",
     "gotIt": "J’ai compris"
   },

@@ -78,6 +78,7 @@ export function Sidebar({
   const [collapsedLabels, setCollapsedLabels] = useState<Set<EntityLabel>>(
     () => new Set(ENTITY_LABELS)
   )
+  const [regionsCollapsed, setRegionsCollapsed] = useState(true)
   const labelPickerRef = useRef<HTMLDivElement>(null)
 
   const toggleLabelCollapsed = (label: EntityLabel) => {
@@ -141,7 +142,6 @@ export function Sidebar({
 
   const signatureRegions = useMemo(() => {
     return regions
-      .filter((r) => r.kind === 'signature')
       .slice()
       .sort((a, b) => a.pageIndex - b.pageIndex)
   }, [regions])
@@ -296,18 +296,33 @@ export function Sidebar({
             {/* Signature regions (PDF annotation widgets) */}
             {signatureRegions.length > 0 && (
               <div className="border-b border-slate-100">
-                <div className="px-5 py-3 bg-slate-50 flex items-center gap-3 sticky top-0 z-10">
+                <button
+                  type="button"
+                  className="w-full px-5 py-3 bg-slate-50 flex items-center gap-3 sticky top-0 z-10 hover:bg-slate-100 transition-colors text-left"
+                  onClick={() => setRegionsCollapsed((c) => !c)}
+                >
+                  <svg
+                    className="w-4 h-4 text-slate-500 shrink-0 transition-transform"
+                    style={{ transform: regionsCollapsed ? 'rotate(-90deg)' : undefined }}
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                    strokeWidth={2}
+                  >
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+                  </svg>
                   <div
-                    className="w-2.5 h-2.5 rounded-full"
+                    className="w-2.5 h-2.5 rounded-full shrink-0"
                     style={{ backgroundColor: ENTITY_COLORS.IDENTIFIER }}
                   />
                   <span className="text-sm font-medium text-slate-700 flex-1">
-                    Signature areas
+                    {t('sidebar.regions')}
                   </span>
                   <span className="text-xs text-slate-500">
                     {signatureRegions.length}
                   </span>
-                </div>
+                </button>
+                {!regionsCollapsed && (
                 <div>
                   {signatureRegions.map((region) => (
                     <div
@@ -327,8 +342,8 @@ export function Sidebar({
                     >
                       <div className="flex items-start justify-between gap-3">
                         <div className="flex-1 min-w-0">
-                          <p className="text-sm text-slate-800 truncate font-medium" title="Signature area">
-                            Signature area
+                          <p className="text-sm text-slate-800 truncate font-medium">
+                            {region.kind === 'manual' ? t('boxSelection.label') : t('sidebar.signatureArea')}
                           </p>
                           <div className="flex items-center gap-2 mt-1">
                             <span className="text-xs text-slate-500">
@@ -389,6 +404,7 @@ export function Sidebar({
                     </div>
                   ))}
                 </div>
+                )}
               </div>
             )}
           {Array.from(groupedByLabelAndText.entries()).map(([label, groups]) => {

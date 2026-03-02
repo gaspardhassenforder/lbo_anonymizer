@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, useLayoutEffect } from 'react'
 import { useTranslation } from 'react-i18next'
-import type { DetectedSpan, EntityLabel } from '../types'
+import type { DetectedSpan, EntityLabel, RedactionRegion } from '../types'
 import { ENTITY_LABELS, ENTITY_COLORS } from '../types'
 import { ConfirmDialog } from './ConfirmDialog'
 import { ScopeSelectionDialog, ScopeOption } from './ScopeSelectionDialog'
@@ -396,13 +396,14 @@ interface LabelPickerProps {
   selectedText: string
   matchCount: number
   hasMultipleDocuments?: boolean
+  noScope?: boolean
   onSelect: (label: EntityLabel, scope: ScopeOption) => void
   onClose: () => void
 }
 
 const LABEL_PICKER_WIDTH = 260
 
-export function LabelPicker({ anchorRect, selectedText, matchCount, hasMultipleDocuments = false, onSelect, onClose }: LabelPickerProps) {
+export function LabelPicker({ anchorRect, selectedText, matchCount, hasMultipleDocuments = false, noScope = false, onSelect, onClose }: LabelPickerProps) {
   const { t } = useTranslation()
   const popoverRef = useRef<HTMLDivElement>(null)
   const [position, setPosition] = useState({ x: 0, y: 0 })
@@ -472,6 +473,10 @@ export function LabelPicker({ anchorRect, selectedText, matchCount, hasMultipleD
   }, [onClose, showScopeDialog])
 
   const handleLabelClick = (label: EntityLabel) => {
+    if (noScope) {
+      onSelect(label, 'this_instance')
+      return
+    }
     setSelectedLabel(label)
     setShowScopeDialog(true)
   }
@@ -541,5 +546,152 @@ export function LabelPicker({ anchorRect, selectedText, matchCount, hasMultipleD
         />
       )}
     </>
+  )
+}
+
+interface RegionTagPopoverProps {
+  region: RedactionRegion
+  anchorRect: DOMRect
+  onChangeLabel: (label: EntityLabel) => void
+  onRemove: () => void
+  onClose: () => void
+}
+
+const REGION_POPOVER_WIDTH = 240
+
+export function RegionTagPopover({ region, anchorRect, onChangeLabel, onRemove, onClose }: RegionTagPopoverProps) {
+  const { t } = useTranslation()
+  const popoverRef = useRef<HTMLDivElement>(null)
+  const [showLabelPicker, setShowLabelPicker] = useState(false)
+  const [position, setPosition] = useState({ x: 0, y: 0 })
+
+  useLayoutEffect(() => {
+    if (!popoverRef.current) return
+    const popoverRect = popoverRef.current.getBoundingClientRect()
+    const viewportWidth = window.innerWidth
+    const viewportHeight = window.innerHeight
+
+    let x = anchorRect.left + anchorRect.width / 2 - REGION_POPOVER_WIDTH / 2
+    x = Math.max(POPOVER_GAP, Math.min(x, viewportWidth - REGION_POPOVER_WIDTH - POPOVER_GAP))
+
+    const spaceBelow = viewportHeight - anchorRect.bottom - POPOVER_GAP
+    const spaceAbove = anchorRect.top - POPOVER_GAP
+    let y: number
+    if (spaceBelow >= popoverRect.height || spaceBelow >= spaceAbove) {
+      y = Math.min(anchorRect.bottom + POPOVER_GAP, viewportHeight - popoverRect.height - POPOVER_GAP)
+    } else {
+      y = Math.max(POPOVER_GAP, anchorRect.top - popoverRect.height - POPOVER_GAP)
+    }
+
+    setPosition({ x, y })
+  }, [anchorRect, showLabelPicker])
+
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (popoverRef.current && !popoverRef.current.contains(e.target as Node)) {
+        onClose()
+      }
+    }
+    const id = setTimeout(() => document.addEventListener('mousedown', handleClickOutside), 0)
+    return () => {
+      clearTimeout(id)
+      document.removeEventListener('mousedown', handleClickOutside)
+    }
+  }, [onClose])
+
+  useEffect(() => {
+    const handleEscape = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose()
+    }
+    document.addEventListener('keydown', handleEscape)
+    return () => document.removeEventListener('keydown', handleEscape)
+  }, [onClose])
+
+  return (
+    <div
+      ref={popoverRef}
+      className="fixed z-50 bg-white border border-slate-200 rounded-xl shadow-dropdown overflow-hidden animate-slide-up"
+      style={{ left: position.x, top: position.y, width: REGION_POPOVER_WIDTH }}
+    >
+      {/* Color accent bar */}
+      <div className="h-1" style={{ backgroundColor: ENTITY_COLORS[region.label] }} />
+
+      {/* Header */}
+      <div className="px-4 py-3 border-b border-slate-100">
+        <div className="flex items-center gap-3">
+          <div
+            className="w-7 h-7 rounded-lg flex items-center justify-center"
+            style={{ backgroundColor: `${ENTITY_COLORS[region.label]}15` }}
+          >
+            <div className="w-2.5 h-2.5 rounded-sm" style={{ backgroundColor: ENTITY_COLORS[region.label] }} />
+          </div>
+          <div>
+            <p className="text-sm font-medium text-slate-800">{t(`entities.${region.label}`)}</p>
+            <p className="text-xs text-slate-400 mt-0.5">{t('boxSelection.label')}</p>
+          </div>
+        </div>
+      </div>
+
+      {/* Actions */}
+      <div className="p-2">
+        {!showLabelPicker ? (
+          <>
+            <button
+              className="w-full px-3 py-2.5 text-left text-sm text-slate-600 hover:bg-slate-50 rounded-lg flex items-center gap-3 transition-colors"
+              onClick={() => setShowLabelPicker(true)}
+            >
+              <svg className="w-4 h-4 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
+              </svg>
+              {t('popover.changeLabel')}
+            </button>
+            <button
+              className="w-full px-3 py-2.5 text-left text-sm text-danger-600 hover:bg-danger-50 rounded-lg flex items-center gap-3 transition-colors"
+              onClick={() => { onRemove(); onClose() }}
+            >
+              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0" />
+              </svg>
+              {t('popover.remove')}
+            </button>
+          </>
+        ) : (
+          <div>
+            <button
+              className="w-full px-3 py-2 text-left text-sm text-slate-400 hover:bg-slate-50 rounded-lg flex items-center gap-2 mb-1 transition-colors"
+              onClick={() => setShowLabelPicker(false)}
+            >
+              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
+              </svg>
+              {t('popover.back')}
+            </button>
+            <div className="max-h-48 overflow-y-auto">
+              {ENTITY_LABELS.map((label) => (
+                <button
+                  key={label}
+                  className={`
+                    w-full px-3 py-2.5 text-left text-sm rounded-lg flex items-center gap-3 transition-colors
+                    ${label === region.label ? 'bg-slate-100 text-slate-800' : 'text-slate-600 hover:bg-slate-50'}
+                  `}
+                  onClick={() => {
+                    if (label !== region.label) onChangeLabel(label)
+                    onClose()
+                  }}
+                >
+                  <div className="w-3 h-3 rounded-full" style={{ backgroundColor: ENTITY_COLORS[label] }} />
+                  {t(`entities.${label}`)}
+                  {label === region.label && (
+                    <svg className="w-4 h-4 ml-auto text-success-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                    </svg>
+                  )}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
   )
 }

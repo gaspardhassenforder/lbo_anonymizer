@@ -35,6 +35,10 @@ interface PaginatedPdfViewerProps {
   countTextMatches: (text: string) => number
   getInstanceCount: (normalizedText: string) => number
   previewAnonymized?: boolean
+  selectionMode?: 'token' | 'box'
+  onRegionAdd?: (pageIndex: number, bbox: import('../types').BBox, label: import('../types').EntityLabel) => void
+  onRegionRemove?: (regionId: string) => void
+  onRegionLabelChange?: (regionId: string, label: import('../types').EntityLabel) => void
 }
 
 export function PaginatedPdfViewer({
@@ -65,6 +69,10 @@ export function PaginatedPdfViewer({
   countTextMatches,
   getInstanceCount,
   previewAnonymized,
+  selectionMode,
+  onRegionAdd,
+  onRegionRemove,
+  onRegionLabelChange,
 }: PaginatedPdfViewerProps) {
   const { t } = useTranslation()
   // Track loaded PDF page with its index
@@ -275,6 +283,10 @@ export function PaginatedPdfViewer({
             countTextMatches={countTextMatches}
             getInstanceCount={getInstanceCount}
             previewAnonymized={previewAnonymized}
+            selectionMode={selectionMode}
+            onRegionAdd={onRegionAdd}
+            onRegionRemove={onRegionRemove}
+            onRegionLabelChange={onRegionLabelChange}
           />
         </div>
       </div>

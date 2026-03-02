@@ -7,7 +7,7 @@ interface RegionLayerProps {
   pageHeight: number
   scale: number
   selectedRegionId: string | null
-  onRegionClick: (region: RedactionRegion) => void
+  onRegionClick: (region: RedactionRegion, anchorRect: DOMRect) => void
   previewAnonymized?: boolean
 }
 
@@ -48,7 +48,7 @@ export function RegionLayer({
             }}
             onClick={(e) => {
               e.stopPropagation()
-              onRegionClick(region)
+              onRegionClick(region, (e.currentTarget as HTMLElement).getBoundingClientRect())
             }}
             title={`${region.kind}: ${region.label}`}
           />

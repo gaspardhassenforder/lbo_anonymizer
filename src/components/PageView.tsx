@@ -1,11 +1,14 @@
 import { useEffect, useRef, useCallback, useState, useMemo } from 'react'
+import { useTranslation } from 'react-i18next'
 import type { PDFPageProxy } from 'pdfjs-dist'
-import type { PageModel, DetectedSpan, EntityLabel, RedactionRegion, Token } from '../types'
+import type { PageModel, DetectedSpan, EntityLabel, RedactionRegion, Token, BBox } from '../types'
 import { cleanupCanvas } from '../pdf/render'
+import { screenToPdf } from '../pdf/geometry'
 import { AnnotationLayer } from './AnnotationLayer'
+import { BoxSelectionLayer } from './BoxSelectionLayer'
 import { RegionLayer } from './RegionLayer'
 import { TextLayer } from './TextLayer'
-import { TagPopover, LabelPicker } from './TagPopover'
+import { TagPopover, LabelPicker, RegionTagPopover } from './TagPopover'
 import { normalizeText } from '../state/store'
 import type { ScopeOption } from './ScopeSelectionDialog'
 
@@ -31,6 +34,10 @@ interface PageViewProps {
   countTextMatches: (text: string) => number
   getInstanceCount: (normalizedText: string) => number
   previewAnonymized?: boolean
+  selectionMode?: 'token' | 'box'
+  onRegionAdd?: (pageIndex: number, bbox: BBox, label: EntityLabel) => void
+  onRegionRemove?: (regionId: string) => void
+  onRegionLabelChange?: (regionId: string, label: EntityLabel) => void
 }
 
 export function PageView({
@@ -55,13 +62,22 @@ export function PageView({
   countTextMatches,
   getInstanceCount,
   previewAnonymized,
+  selectionMode = 'token',
+  onRegionAdd,
+  onRegionRemove,
+  onRegionLabelChange,
 }: PageViewProps) {
+  const { t } = useTranslation()
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const containerRef = useRef<HTMLDivElement>(null)
   const renderTaskRef = useRef<{ cancel: () => void } | null>(null)
   const [isRendered, setIsRendered] = useState(false)
   const [popover, setPopover] = useState<{
     spanId: string
+    anchorRect: DOMRect
+  } | null>(null)
+  const [regionPopover, setRegionPopover] = useState<{
+    regionId: string
     anchorRect: DOMRect
   } | null>(null)
   const [extensionPreview, setExtensionPreview] = useState<{
@@ -74,6 +90,10 @@ export function PageView({
     charStart: number
     charEnd: number
     text: string
+    anchorRect: DOMRect
+  } | null>(null)
+  const [boxLabelPicker, setBoxLabelPicker] = useState<{
+    pdfBbox: BBox
     anchorRect: DOMRect
   } | null>(null)
 
@@ -176,8 +196,9 @@ export function PageView({
     setPopover({ spanId: span.id, anchorRect: targetRect })
   }, [onSpanClick])
 
-  const handleRegionClick = useCallback((region: RedactionRegion) => {
+  const handleRegionClick = useCallback((region: RedactionRegion, anchorRect: DOMRect) => {
     onRegionClick(region)
+    setRegionPopover({ regionId: region.id, anchorRect })
   }, [onRegionClick])
 
   // Receive hover position from TextLayer; build a ghost preview in the entity's color
@@ -236,6 +257,27 @@ export function PageView({
     setLabelPicker(null)
   }, [labelPicker, onSpanAdd])
 
+  // Handle a box drawn in BoxSelectionLayer — convert to PDF coords and open label picker
+  const handleBoxDrawn = useCallback((screenBbox: BBox) => {
+    const pdfBbox = screenToPdf(screenBbox, pageModel.height, scale)
+    const containerRect = containerRef.current?.getBoundingClientRect()
+    if (!containerRect) return
+    const anchorRect = new DOMRect(
+      containerRect.left + screenBbox.x,
+      containerRect.top + screenBbox.y,
+      screenBbox.width,
+      screenBbox.height,
+    )
+    setBoxLabelPicker({ pdfBbox, anchorRect })
+  }, [pageModel.height, scale])
+
+  // Handle label selection for a drawn box region
+  const handleBoxLabelSelect = useCallback((label: EntityLabel) => {
+    if (!boxLabelPicker) return
+    onRegionAdd?.(pageModel.pageIndex, boxLabelPicker.pdfBbox, label)
+    setBoxLabelPicker(null)
+  }, [boxLabelPicker, onRegionAdd, pageModel.pageIndex])
+
   // Page dimensions
   const width = pageModel.width * scale
   const height = pageModel.height * scale
@@ -269,7 +311,13 @@ export function PageView({
           onSelectionEnd={handleSelectionCreate}
           onAdjacentHover={handleAdjacentHover}
           onExtendSpan={handleExtendSpan}
+          disabled={selectionMode === 'box'}
         />
+      )}
+
+      {/* Box selection overlay — only visible in box mode */}
+      {isRendered && selectionMode === 'box' && (
+        <BoxSelectionLayer onBoxDrawn={handleBoxDrawn} />
       )}
 
       {/* Annotation layer for highlights (z-index: 2) */}
@@ -280,7 +328,7 @@ export function PageView({
             pageHeight={pageModel.height}
             scale={scale}
             selectedRegionId={selectedRegionId}
-            onRegionClick={(region) => handleRegionClick(region)}
+            onRegionClick={(region, anchorRect) => handleRegionClick(region, anchorRect)}
             previewAnonymized={previewAnonymized}
           />
           <AnnotationLayer
@@ -341,6 +389,39 @@ export function PageView({
           hasMultipleDocuments={hasMultipleDocuments}
           onSelect={handleLabelSelect}
           onClose={() => setLabelPicker(null)}
+        />
+      )}
+
+      {/* Region tag popover — edit label or remove a drawn / PDF-annotation region */}
+      {regionPopover && (() => {
+        const region = pageRegions.find((r) => r.id === regionPopover.regionId)
+        if (!region) return null
+        return (
+          <RegionTagPopover
+            region={region}
+            anchorRect={regionPopover.anchorRect}
+            onChangeLabel={(label) => {
+              onRegionLabelChange?.(region.id, label)
+              setRegionPopover(null)
+            }}
+            onRemove={() => {
+              onRegionRemove?.(region.id)
+              setRegionPopover(null)
+            }}
+            onClose={() => setRegionPopover(null)}
+          />
+        )
+      })()}
+
+      {/* Label picker for drawn box regions (no scope — one-off redaction) */}
+      {boxLabelPicker && (
+        <LabelPicker
+          anchorRect={boxLabelPicker.anchorRect}
+          selectedText={t('boxSelection.label')}
+          matchCount={0}
+          noScope={true}
+          onSelect={(label) => handleBoxLabelSelect(label)}
+          onClose={() => setBoxLabelPicker(null)}
         />
       )}
     </div>

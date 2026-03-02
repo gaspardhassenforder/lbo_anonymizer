@@ -76,8 +76,8 @@ export interface RedactionRegion {
   pageIndex: number
   bbox: BBox
   label: EntityLabel
-  source: 'pdf-annotation'
-  kind: 'signature'
+  source: 'pdf-annotation' | 'user'
+  kind: 'signature' | 'manual'
 }
 
 // A detected span of text

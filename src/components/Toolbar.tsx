@@ -10,6 +10,8 @@ interface ToolbarProps {
   currentLanguage: string
   previewAnonymized: boolean
   onTogglePreview: () => void
+  selectionMode?: 'token' | 'box'
+  onToggleSelectionMode?: () => void
 }
 
 export function Toolbar({
@@ -20,6 +22,8 @@ export function Toolbar({
   currentLanguage,
   previewAnonymized,
   onTogglePreview,
+  selectionMode = 'token',
+  onToggleSelectionMode,
 }: ToolbarProps) {
   const { t } = useTranslation()
   const zoom = useStore((state) => state.zoom)
@@ -163,6 +167,25 @@ export function Toolbar({
         </svg>
         <span>{t('toolbar.previewAnonymized')}</span>
       </button>
+
+      {/* Box selection mode toggle */}
+      {onToggleSelectionMode && (
+        <button
+          onClick={onToggleSelectionMode}
+          title={t('toolbar.boxSelectMode')}
+          className={[
+            'flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium transition-all duration-150',
+            selectionMode === 'box'
+              ? 'bg-slate-800 text-white hover:bg-slate-700'
+              : 'text-slate-500 hover:text-slate-700 hover:bg-slate-100',
+          ].join(' ')}
+        >
+          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+            <rect x="3" y="3" width="18" height="18" rx="1" strokeDasharray="4 2" />
+          </svg>
+          <span>{t('toolbar.boxSelectMode')}</span>
+        </button>
+      )}
 
       {/* Divider */}
       <div className="h-8 w-px bg-slate-200" />

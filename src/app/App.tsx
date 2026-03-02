@@ -37,6 +37,7 @@ export default function App() {
   const [processingFromLocationState, setProcessingFromLocationState] = useState(false)
   const [showEditorHelp, setShowEditorHelp] = useState(false)
   const [previewAnonymized, setPreviewAnonymized] = useState(false)
+  const [selectionMode, setSelectionMode] = useState<'token' | 'box'>('token')
   const [showSelectHint, setShowSelectHint] = useState(
     () => (typeof window !== 'undefined' ? !localStorage.getItem('lbo-anonymizer-select-hint-dismissed') : true)
   )
@@ -528,6 +529,15 @@ export default function App() {
     setDirty(true)
   }, [updateRegionLabel, setDirty])
 
+  const handleToggleSelectionMode = useCallback(() => {
+    setSelectionMode(m => m === 'token' ? 'box' : 'token')
+  }, [])
+
+  const handleRegionAdd = useCallback((pageIndex: number, bbox: import('../types').BBox, label: EntityLabel) => {
+    addPageRegions([{ id: crypto.randomUUID(), pageIndex, bbox, label, source: 'user', kind: 'manual' }])
+    setDirty(true)
+  }, [addPageRegions, setDirty])
+
   // Change label for all instances of a normalized text
   const updateSpanLabelByNormalizedText = useStore((state) => state.updateSpanLabelByNormalizedText)
   const handleSpanLabelChangeAll = useCallback((normalizedText: string, label: EntityLabel) => {
@@ -869,7 +879,7 @@ export default function App() {
     try {
       // Prepare entities JSON (store all spans, including user edits)
       const entitiesJson = JSON.stringify(spans)
-      const regionsJson = JSON.stringify(regions)
+      const regionsJson = JSON.stringify(useStore.getState().regions)
 
       // Prepare pages JSON (store PageModels so we don't need to re-run OCR)
       const pagesJson = JSON.stringify(pages)
@@ -985,6 +995,8 @@ export default function App() {
         currentLanguage={i18n.language}
         previewAnonymized={previewAnonymized}
         onTogglePreview={() => setPreviewAnonymized(v => !v)}
+        selectionMode={selectionMode}
+        onToggleSelectionMode={handleToggleSelectionMode}
       />
 
       {/* Main content */}
@@ -1029,6 +1041,10 @@ export default function App() {
                 countTextMatches={countTextMatches}
                 getInstanceCount={getInstanceCount}
                 previewAnonymized={previewAnonymized}
+                selectionMode={selectionMode}
+                onRegionAdd={handleRegionAdd}
+                onRegionRemove={handleRegionRemove}
+                onRegionLabelChange={handleRegionLabelChange}
               />
             )}
           </div>

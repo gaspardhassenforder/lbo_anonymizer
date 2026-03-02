@@ -10,9 +10,10 @@ interface TextLayerProps {
   onSelectionEnd: (charStart: number, charEnd: number, text: string, anchorRect: DOMRect) => void
   onAdjacentHover?: (preview: { charStart: number; charEnd: number } | null) => void
   onExtendSpan?: (charStart: number, charEnd: number) => void
+  disabled?: boolean
 }
 
-export function TextLayer({ tokens, pageHeight, scale, selectedSpan, onSelectionEnd, onAdjacentHover, onExtendSpan }: TextLayerProps) {
+export function TextLayer({ tokens, pageHeight, scale, selectedSpan, onSelectionEnd, onAdjacentHover, onExtendSpan, disabled = false }: TextLayerProps) {
   const layerRef = useRef<HTMLDivElement>(null)
   const [startIdx, setStartIdx] = useState<number | null>(null)
   const [hoverIdx, setHoverIdx] = useState<number | null>(null)
@@ -178,7 +179,7 @@ export function TextLayer({ tokens, pageHeight, scale, selectedSpan, onSelection
     <div
       ref={layerRef}
       className="text-layer absolute inset-0"
-      style={{ userSelect: 'none', cursor: 'text', zIndex }}
+      style={{ userSelect: 'none', cursor: 'text', zIndex, pointerEvents: disabled ? 'none' : undefined }}
       onMouseDown={handleMouseDown}
       onMouseMove={handleMouseMove}
       onMouseLeave={handleMouseLeave}
