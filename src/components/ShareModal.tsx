@@ -1,7 +1,7 @@
 import { useState, useCallback, useEffect } from 'react'
 import { useTranslation } from 'react-i18next'
 import type { SavedDocumentMeta } from '../state/store'
-import { normalizeText } from '../state/store'
+import { normalizeText, useStore } from '../state/store'
 import { getDocumentData } from '../state/documentsPersistence'
 import { loadPdf, getPdfPage } from '../pdf/pdfLoader'
 import { exportPdfAsBlob } from '../export/exportHybridPdf'
@@ -10,7 +10,7 @@ import { normalizeEntityLabel } from '../types'
 
 const FUNCTION_URL = 'https://lbouploadovxwraxy-pdf-upload.functions.fnc.fr-par.scw.cloud'
 
-type Phase = 'filename_review' | 'questionnaire' | 'feedback' | 'uploading' | 'result'
+type Phase = 'filename_review' | 'questionnaire' | 'share_rules' | 'feedback' | 'uploading' | 'result'
 
 interface ShareModalProps {
   isOpen: boolean
@@ -29,6 +29,11 @@ export function ShareModal({ isOpen, onClose, documents, onRenameDocument }: Sha
   const [uploadTotal, setUploadTotal] = useState(0)
   const [error, setError] = useState<string | null>(null)
 
+  const suppressedTexts = useStore((state) => state.suppressedTexts)
+
+  const [selectedSuppressed, setSelectedSuppressed] = useState<Set<string>>(new Set())
+  const [rulesToShare, setRulesToShare] = useState<{ suppressedTexts: string[] } | null>(null)
+
   // Reset state when modal opens
   useEffect(() => {
     if (isOpen) {
@@ -39,7 +44,10 @@ export function ShareModal({ isOpen, onClose, documents, onRenameDocument }: Sha
       setUploadCurrent(0)
       setUploadTotal(0)
       setError(null)
+      setSelectedSuppressed(new Set(suppressedTexts))
+      setRulesToShare(null)
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOpen])
 
   // Block escape during upload
@@ -75,7 +83,8 @@ export function ShareModal({ isOpen, onClose, documents, onRenameDocument }: Sha
     setError(null)
     const sessionId = crypto.randomUUID()
     const total = documents.length
-    setUploadTotal(total)
+    const willShareRules = rulesToShare !== null && rulesToShare.suppressedTexts.length > 0
+    setUploadTotal(total + (willShareRules ? 2 : 1))
 
     try {
       // Step 1: Generate all PDF blobs sequentially (avoids memory pressure)
@@ -216,6 +225,32 @@ export function ShareModal({ isOpen, onClose, documents, onRenameDocument }: Sha
         throw new Error(`Questionnaire upload failed: ${qResp.status}`)
       }
 
+      // Step 5: Upload rules anonymously (failure is non-blocking)
+      if (willShareRules && rulesToShare) {
+        setUploadCurrent(total + 2)
+        try {
+          const rulesResp = await fetch(FUNCTION_URL, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              sessionId,
+              type: 'false_positives',
+              data: {
+                id: crypto.randomUUID(),
+                submittedAt: new Date().toISOString(),
+                suppressedTexts: rulesToShare.suppressedTexts,
+                sectors: Array.isArray(answers.sectors) ? answers.sectors : [],
+              },
+            }),
+          })
+          if (!rulesResp.ok) {
+            console.warn('[ShareModal] Rules upload returned non-OK:', rulesResp.status)
+          }
+        } catch (rulesErr) {
+          console.warn('[ShareModal] Rules upload failed (non-blocking):', rulesErr)
+        }
+      }
+
       setPhase('result')
       setError(null)
     } catch (err) {
@@ -223,7 +258,7 @@ export function ShareModal({ isOpen, onClose, documents, onRenameDocument }: Sha
       setPhase('result')
       setError(err instanceof Error ? err.message : 'Unknown error')
     }
-  }, [documents, answers, feedbackText, editedFilenames])
+  }, [documents, answers, feedbackText, editedFilenames, rulesToShare])
 
   if (!isOpen) return null
 
@@ -440,11 +475,85 @@ export function ShareModal({ isOpen, onClose, documents, onRenameDocument }: Sha
                 {t('share.cancel')}
               </button>
               <button
-                onClick={() => setPhase('feedback')}
+                onClick={() => setPhase(suppressedTexts.size > 0 ? 'share_rules' : 'feedback')}
                 className="px-4 py-2 text-sm font-medium text-white bg-emerald-600 hover:bg-emerald-700 rounded-lg shadow-sm transition-colors"
               >
                 {t('share.continue')} →
               </button>
+            </div>
+          </div>
+        )}
+
+        {/* ── Share rules phase ── */}
+        {phase === 'share_rules' && (
+          <div className="px-8 py-8">
+            {/* Header */}
+            <div className="flex items-center gap-3 mb-2">
+              <div className="p-2 rounded-xl bg-emerald-100">
+                <svg className="w-6 h-6 text-emerald-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+              </div>
+              <h2 className="text-xl font-bold text-slate-800">{t('share.rulesTitle')}</h2>
+            </div>
+            <p className="text-sm text-slate-500 mb-6">{t('share.rulesSubtitle')}</p>
+
+            <div className="max-h-[50vh] overflow-y-auto pr-1">
+              <div className="flex items-center justify-between mb-1">
+                <p className="text-sm font-medium text-slate-700">{t('share.rulesSuppressedSection')}</p>
+                <div className="flex gap-2 text-xs text-emerald-600">
+                  <button onClick={() => setSelectedSuppressed(new Set(suppressedTexts))}>{t('share.rulesSelectAll')}</button>
+                  <span className="text-slate-300">·</span>
+                  <button onClick={() => setSelectedSuppressed(new Set())}>{t('share.rulesDeselectAll')}</button>
+                </div>
+              </div>
+              <div className="space-y-0.5">
+                {Array.from(suppressedTexts).map((text) => (
+                  <label key={text} className="flex items-center gap-2 px-3 py-1.5 rounded-lg hover:bg-slate-50 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={selectedSuppressed.has(text)}
+                      onChange={() => setSelectedSuppressed(prev => {
+                        const next = new Set(prev)
+                        next.has(text) ? next.delete(text) : next.add(text)
+                        return next
+                      })}
+                      className="accent-emerald-600"
+                    />
+                    <span className="text-sm text-slate-700 font-mono">{text}</span>
+                  </label>
+                ))}
+              </div>
+            </div>
+
+            {/* Actions */}
+            <div className="flex justify-between items-center mt-6">
+              <button
+                onClick={() => setPhase('questionnaire')}
+                className="px-4 py-2 text-sm font-medium text-slate-600 hover:text-slate-800 hover:bg-slate-100 rounded-lg transition-colors"
+              >
+                {t('share.back')}
+              </button>
+              <div className="flex gap-3">
+                <button
+                  onClick={() => {
+                    setRulesToShare(null)
+                    setPhase('feedback')
+                  }}
+                  className="px-4 py-2 text-sm font-medium text-slate-600 hover:text-slate-800 hover:bg-slate-100 rounded-lg transition-colors"
+                >
+                  {t('share.rulesSkip')}
+                </button>
+                <button
+                  onClick={() => {
+                    setRulesToShare({ suppressedTexts: Array.from(selectedSuppressed) })
+                    setPhase('feedback')
+                  }}
+                  className="px-4 py-2 text-sm font-medium text-white bg-emerald-600 hover:bg-emerald-700 rounded-lg shadow-sm transition-colors"
+                >
+                  {t('share.rulesShare')}
+                </button>
+              </div>
             </div>
           </div>
         )}
@@ -474,7 +583,7 @@ export function ShareModal({ isOpen, onClose, documents, onRenameDocument }: Sha
             {/* Actions */}
             <div className="flex justify-end gap-3 mt-6">
               <button
-                onClick={() => setPhase('questionnaire')}
+                onClick={() => setPhase(suppressedTexts.size > 0 ? 'share_rules' : 'questionnaire')}
                 className="px-4 py-2 text-sm font-medium text-slate-600 hover:text-slate-800 hover:bg-slate-100 rounded-lg transition-colors"
               >
                 {t('share.back')}
@@ -496,9 +605,11 @@ export function ShareModal({ isOpen, onClose, documents, onRenameDocument }: Sha
             <div className="mx-auto mb-4 w-12 h-12 rounded-full border-4 border-slate-200 border-t-emerald-500 animate-spin" />
 
             <p className="text-sm font-medium text-slate-700 mb-4">
-              {uploadCurrent <= uploadTotal
-                ? t('share.uploading', { current: uploadCurrent, total: uploadTotal })
-                : t('share.uploadingQuestionnaire')}
+              {uploadCurrent <= documents.length
+                ? t('share.uploading', { current: uploadCurrent, total: documents.length })
+                : uploadCurrent === documents.length + 1
+                  ? t('share.uploadingQuestionnaire')
+                  : t('share.uploadingRules')}
             </p>
 
             {/* Progress bar */}
@@ -506,7 +617,7 @@ export function ShareModal({ isOpen, onClose, documents, onRenameDocument }: Sha
               <div
                 className="h-full bg-emerald-500 transition-all duration-300"
                 style={{
-                  width: `${uploadTotal > 0 ? (Math.min(uploadCurrent, uploadTotal) / (uploadTotal + 1)) * 100 : 0}%`,
+                  width: `${uploadTotal > 0 ? (uploadCurrent / uploadTotal) * 100 : 0}%`,
                 }}
               />
             </div>

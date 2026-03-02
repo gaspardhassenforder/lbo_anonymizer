@@ -286,6 +286,17 @@
     "errorMessage": "An error occurred during upload. Please try again.",
     "retry": "Retry",
     "close": "Close",
-    "tooLarge": "The document \"{{filename}}\" is too large to upload (max 4.5 MB)."
+    "tooLarge": "The document \"{{filename}}\" is too large to upload (max 4.5 MB).",
+    "rulesTitle": "Share your correction rules",
+    "rulesSubtitle": "You've built up rules to fix the AI's mistakes. Sharing them (anonymously) helps us improve detection for everyone. No documents are attached.",
+    "rulesNoneSelected": "Select at least one rule to share, or skip.",
+    "rulesSkip": "Skip",
+    "rulesShare": "Share selected rules",
+    "rulesSelectAll": "Select all",
+    "rulesDeselectAll": "Deselect all",
+    "rulesSuppressedSection": "Words the AI should never flag",
+    "rulesOverridesSection": "Label corrections",
+    "rulesForcedSection": "Always-detect rules",
+    "uploadingRules": "Sharing your rules..."
   }
 }

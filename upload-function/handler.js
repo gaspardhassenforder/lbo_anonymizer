@@ -97,10 +97,27 @@ async function handleDirectUpload(body) {
     return respond(400, { error: "Missing sessionId, type, or data" });
   }
 
+  if (type === "false_positives") {
+    if (!data.id) {
+      return respond(400, { error: "Missing data.id for false_positives upload" });
+    }
+    const key = `false_positives/${data.id}.json`;
+    const buffer = Buffer.from(JSON.stringify(data, null, 2));
+    await s3.send(
+      new PutObjectCommand({
+        Bucket: BUCKET,
+        Key: key,
+        Body: buffer,
+        ContentType: "application/json",
+      })
+    );
+    return respond(200, { success: true, key });
+  }
+
   if (type !== "questionnaire") {
     return respond(400, {
       error:
-        "Direct upload only supports 'questionnaire'. Use 'get-presigned-urls' for PDFs.",
+        "Direct upload only supports 'questionnaire' or 'false_positives'. Use 'get-presigned-urls' for PDFs.",
     });
   }
 

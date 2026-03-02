@@ -286,6 +286,17 @@
     "errorMessage": "Une erreur est survenue lors de l'envoi. Veuillez réessayer.",
     "retry": "Réessayer",
     "close": "Fermer",
-    "tooLarge": "Le document \"{{filename}}\" est trop volumineux pour être envoyé (max 4.5 Mo)."
+    "tooLarge": "Le document \"{{filename}}\" est trop volumineux pour être envoyé (max 4.5 Mo).",
+    "rulesTitle": "Partager vos règles de correction",
+    "rulesSubtitle": "Vous avez constitué des règles pour corriger les erreurs de l'IA. Les partager (anonymement) nous aide à améliorer la détection pour tous. Aucun document n'est joint.",
+    "rulesNoneSelected": "Sélectionnez au moins une règle à partager, ou ignorez.",
+    "rulesSkip": "Ignorer",
+    "rulesShare": "Partager les règles sélectionnées",
+    "rulesSelectAll": "Tout sélectionner",
+    "rulesDeselectAll": "Tout désélectionner",
+    "rulesSuppressedSection": "Mots que l'IA ne doit jamais signaler",
+    "rulesOverridesSection": "Corrections de types",
+    "rulesForcedSection": "Règles de détection forcée",
+    "uploadingRules": "Partage de vos règles..."
   }
 }
