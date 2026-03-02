@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useLocation } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { useStore, SavedDocumentMeta, normalizeText } from '../state/store'
 import { useModelLoader } from '../hooks/useModelLoader'
@@ -35,6 +35,7 @@ function toDocument(saved: SavedDocumentMeta): Document {
 export default function DocumentListPage() {
   const { t, i18n } = useTranslation()
   const navigate = useNavigate()
+  const location = useLocation()
 
   const user = useStore((state) => state.user)
   const logout = useStore((state) => state.logout)
@@ -307,6 +308,30 @@ export default function DocumentListPage() {
           </div>
         </div>
       </header>
+
+      {/* Tab navigation */}
+      <nav className="bg-white border-b border-slate-200">
+        <div className="max-w-6xl mx-auto px-6">
+          <div className="flex gap-1 py-1">
+            {[
+              { to: '/documents', label: t('rules.documentsTab') },
+              { to: '/rules', label: t('rules.navTab') },
+            ].map(({ to, label }) => (
+              <button
+                key={to}
+                onClick={() => navigate(to)}
+                className={`px-4 py-2 text-sm font-medium rounded-lg transition-colors ${
+                  location.pathname === to
+                    ? 'bg-slate-100 text-slate-800'
+                    : 'text-slate-500 hover:text-slate-700 hover:bg-slate-50'
+                }`}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+        </div>
+      </nav>
 
       {/* Main content */}
       <main className="max-w-6xl mx-auto px-6 py-8">

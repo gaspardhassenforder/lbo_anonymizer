@@ -108,6 +108,9 @@ interface AppState {
   suppressText: (normalizedText: string) => void
   setLabelOverride: (normalizedText: string, label: EntityLabel) => void
   setForcedLabel: (normalizedText: string, label: EntityLabel) => void
+  removeSuppressedText: (normalizedText: string) => void
+  removeLabelOverride: (normalizedText: string) => void
+  removeForcedLabel: (normalizedText: string) => void
   setSelectedSpan: (spanId: string | null) => void
   setSelectedRegion: (regionId: string | null) => void
   setConfidenceThreshold: (threshold: number) => void
@@ -519,6 +522,24 @@ export const useStore = create<AppState>()(
         const newForced = new Map(state.forcedLabels)
         newForced.set(normalizedText, label)
         state.forcedLabels = newForced
+      }),
+
+      removeSuppressedText: (normalizedText) => set((state) => {
+        const next = new Set(state.suppressedTexts)
+        next.delete(normalizedText)
+        state.suppressedTexts = next
+      }),
+
+      removeLabelOverride: (normalizedText) => set((state) => {
+        const next = new Map(state.labelOverrides)
+        next.delete(normalizedText)
+        state.labelOverrides = next
+      }),
+
+      removeForcedLabel: (normalizedText) => set((state) => {
+        const next = new Map(state.forcedLabels)
+        next.delete(normalizedText)
+        state.forcedLabels = next
       }),
 
       setSelectedSpan: (spanId) => set((state) => {

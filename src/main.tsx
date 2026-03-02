@@ -5,6 +5,7 @@ import App from './app/App'
 import OCRView from './app/OCRView'
 import LoginPage from './app/LoginPage'
 import DocumentListPage from './app/DocumentListPage'
+import RulesPage from './app/RulesPage'
 import ProtectedRoute from './app/ProtectedRoute'
 import DropPage from './app/DropPage'
 import './i18n'
@@ -48,6 +49,14 @@ const router = createBrowserRouter([
     element: (
       <ProtectedRoute>
         <DocumentListPage />
+      </ProtectedRoute>
+    ),
+  },
+  {
+    path: '/rules',
+    element: (
+      <ProtectedRoute>
+        <RulesPage />
       </ProtectedRoute>
     ),
   },
