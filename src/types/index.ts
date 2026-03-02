@@ -162,6 +162,7 @@ export type EditAction =
   | { type: 'ADD_SPAN'; span: DetectedSpan }
   | { type: 'REMOVE_SPAN'; spanId: string }
   | { type: 'CHANGE_LABEL'; spanId: string; newLabel: EntityLabel }
+  | { type: 'EXTEND_SPAN'; spanId: string; charStart: number; charEnd: number; text: string; tokens: Token[] }
 
 // Export types
 export interface ExportedToken {

@@ -82,6 +82,7 @@ export default function App() {
   const removeRegion = useStore((state) => state.removeRegion)
   const removeSpansByNormalizedText = useStore((state) => state.removeSpansByNormalizedText)
   const updateSpanLabel = useStore((state) => state.updateSpanLabel)
+  const updateSpanBounds = useStore((state) => state.updateSpanBounds)
   const updateRegionLabel = useStore((state) => state.updateRegionLabel)
   const setSelectedSpan = useStore((state) => state.setSelectedSpan)
   const setSelectedRegion = useStore((state) => state.setSelectedRegion)
@@ -509,6 +510,17 @@ export default function App() {
     updateSpanLabel(spanId, label)
     setDirty(true)
   }, [updateSpanLabel, setDirty])
+
+  const handleSpanExtend = useCallback((
+    spanId: string,
+    charStart: number,
+    charEnd: number,
+    pageText: string,
+    pageTokens: import('../types').Token[]
+  ) => {
+    updateSpanBounds(spanId, charStart, charEnd, pageText, pageTokens)
+    setDirty(true)
+  }, [updateSpanBounds, setDirty])
 
   const handleRegionLabelChange = useCallback((regionId: string, label: EntityLabel) => {
     updateRegionLabel(regionId, label)
@@ -1007,6 +1019,7 @@ export default function App() {
                 onSpanLabelChange={handleSpanLabelChange}
                 onSpanLabelChangeAll={handleSpanLabelChangeAll}
                 onSpanLabelChangeAllDocuments={handleSpanLabelChangeAllDocuments}
+                onSpanExtend={handleSpanExtend}
                 onSpanAdd={handleSpanAdd}
                 onSpanAddAll={handleSpanAddAll}
                 onSpanAddAllDocuments={handleSpanAddAllDocuments}

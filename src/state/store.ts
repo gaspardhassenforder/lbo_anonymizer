@@ -14,8 +14,10 @@ import type {
   EntityLabel,
   PageProcessingStatus,
   ModelLoadingProgress,
+  Token,
 } from '../types'
 import { normalizeEntityLabel } from '../types'
+import { findTokensInRange } from '../pdf/textExtraction'
 
 // Enable Map and Set support for immer
 enableMapSet()
@@ -103,6 +105,7 @@ interface AppState {
   findSpansByNormalizedText: (normalizedText: string) => DetectedSpan[]
   updateSpanLabel: (spanId: string, label: EntityLabel) => void
   updateSpanLabelByNormalizedText: (normalizedText: string, label: EntityLabel) => number
+  updateSpanBounds: (spanId: string, charStart: number, charEnd: number, pageText: string, pageTokens: Token[]) => void
   removeRegion: (regionId: string) => void
   updateRegionLabel: (regionId: string, label: EntityLabel) => void
   suppressText: (normalizedText: string) => void
@@ -471,6 +474,25 @@ export const useStore = create<AppState>()(
           }
         })
         // Update tag map AFTER set() completes to ensure state is synchronized
+        if (updated) {
+          get().updateTagMap()
+        }
+      },
+
+      updateSpanBounds: (spanId, charStart, charEnd, pageText, pageTokens) => {
+        let updated = false
+        set((state) => {
+          const span = state.spans.find((s) => s.id === spanId)
+          if (span) {
+            span.charStart = charStart
+            span.charEnd = charEnd
+            span.text = pageText.slice(charStart, charEnd)
+            span.normalizedText = normalizeText(span.text)
+            span.tokens = findTokensInRange(pageTokens, charStart, charEnd)
+            span.source = 'user'
+            updated = true
+          }
+        })
         if (updated) {
           get().updateTagMap()
         }

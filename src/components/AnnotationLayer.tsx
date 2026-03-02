@@ -1,6 +1,6 @@
 import { useCallback } from 'react'
 import React from 'react'
-import type { DetectedSpan, BBox } from '../types'
+import type { DetectedSpan, BBox, Token, EntityLabel } from '../types'
 import { ENTITY_COLORS } from '../types'
 import { pdfToScreen, getPartialTokenBBox, mergeBBoxesByLine } from '../pdf/geometry'
 
@@ -9,6 +9,12 @@ interface AnnotationLayerProps {
   pageHeight: number
   scale: number
   selectedSpanId: string | null
+  extensionPreview?: {
+    charStart: number
+    charEnd: number
+    tokens: Token[]
+    label: EntityLabel
+  } | null
   onSpanClick: (span: DetectedSpan, event: React.MouseEvent) => void
 }
 
@@ -17,11 +23,12 @@ export function AnnotationLayer({
   pageHeight,
   scale,
   selectedSpanId,
+  extensionPreview,
   onSpanClick,
 }: AnnotationLayerProps) {
   // Get screen coordinates for a span, merged by line (one highlight per line)
   // Uses partial bboxes to highlight only the entity portion within each token
-  const getSpanScreenBBoxes = useCallback((span: DetectedSpan): BBox[] => {
+  const getSpanScreenBBoxes = useCallback((span: { tokens: Token[]; charStart: number; charEnd: number }): BBox[] => {
     if (!span.tokens || span.tokens.length === 0) {
       return []
     }
@@ -40,6 +47,27 @@ export function AnnotationLayer({
 
   return (
     <div className="absolute inset-0 pointer-events-none" style={{ zIndex: 2 }}>
+      {/* Ghost preview for hover-to-grow extension */}
+      {extensionPreview && (() => {
+        const ghostBBoxes = getSpanScreenBBoxes(extensionPreview)
+        const ghostColor = ENTITY_COLORS[extensionPreview.label]
+        return ghostBBoxes.map((bbox, i) => (
+          <div
+            key={`ghost-${i}`}
+            style={{
+              position: 'absolute',
+              left: bbox.x,
+              top: bbox.y,
+              width: bbox.width,
+              height: bbox.height,
+              backgroundColor: ghostColor,
+              opacity: 0.4,
+              pointerEvents: 'none',
+            }}
+          />
+        ))
+      })()}
+
       {/* Span highlights */}
       {spans.map((span) => {
         const bboxes = getSpanScreenBBoxes(span)

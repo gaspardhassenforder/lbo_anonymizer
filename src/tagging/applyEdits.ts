@@ -62,6 +62,13 @@ export function applyEdit(
         return span
       })
     }
+
+    case 'EXTEND_SPAN':
+      return spans.map((s) =>
+        s.id === action.spanId
+          ? { ...s, charStart: action.charStart, charEnd: action.charEnd, text: action.text, tokens: action.tokens, source: 'user' as const }
+          : s
+      )
   }
 }
 

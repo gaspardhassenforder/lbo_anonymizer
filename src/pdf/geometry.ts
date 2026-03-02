@@ -226,14 +226,20 @@ export function getPartialTokenBBox(
   const tokenLength = token.charEnd - token.charStart
   if (tokenLength === 0) return token.bbox
 
-  // Estimate actual text width based on character count
-  // Character width is typically ~0.55x the line height for most fonts
-  const estimatedCharWidth = token.bbox.height * 0.55
-  const estimatedTextWidth = tokenLength * estimatedCharWidth
+  // Fast path: span fully covers the token — use the real bbox directly
+  if (spanCharStart <= token.charStart && spanCharEnd >= token.charEnd) {
+    return token.bbox
+  }
 
-  // Use the smaller of token bbox width and estimated text width
-  // This prevents highlights from spanning the entire line when token bbox is line-wide
-  const effectiveWidth = Math.min(token.bbox.width, estimatedTextWidth)
+  // Determine per-character width for the partial highlight.
+  // Prefer the actual bbox width divided by char count (accurate for normal and bold text).
+  // Fall back to a height-based estimate only when the per-character value exceeds
+  // 1.2× the line height — a reliable signal that the bbox is line-wide rather than
+  // word-wide (some PDF extractors give a bbox that spans the whole text line).
+  const rawCharWidth = token.bbox.width / tokenLength
+  const charWidth = rawCharWidth <= token.bbox.height * 1.2
+    ? rawCharWidth
+    : token.bbox.height * 0.55
 
   // Clamp span range to token boundaries
   const clampedStart = Math.max(spanCharStart, token.charStart)
@@ -244,9 +250,14 @@ export function getPartialTokenBBox(
   const charOffsetEnd = clampedEnd - token.charStart
 
   // Calculate proportional position using effective width
-  const charWidth = effectiveWidth / tokenLength
   let partialX = token.bbox.x + charOffsetStart * charWidth
   let partialWidth = (charOffsetEnd - charOffsetStart) * charWidth
+
+  // Add a small right-side buffer (~1/6 of line height) to compensate for variable
+  // glyph widths: proportional spacing assumes uniform char widths, but the last
+  // character(s) at the right edge are often slightly wider than the per-char average.
+  // The clamp below keeps this within the token's actual right boundary.
+  partialWidth += token.bbox.height * 0.15
 
   // Clamp to token bbox boundaries (never exceed original token bounds)
   const tokenMaxX = token.bbox.x + token.bbox.width

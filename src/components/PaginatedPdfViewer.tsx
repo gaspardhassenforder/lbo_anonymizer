@@ -31,6 +31,7 @@ interface PaginatedPdfViewerProps {
   onSpanAdd: (pageIndex: number, charStart: number, charEnd: number, text: string, label: EntityLabel) => void
   onSpanAddAll: (pageIndex: number, charStart: number, charEnd: number, text: string, label: EntityLabel) => void
   onSpanAddAllDocuments?: (text: string, label: EntityLabel) => void
+  onSpanExtend?: (spanId: string, charStart: number, charEnd: number, pageText: string, pageTokens: import('../types').Token[]) => void
   countTextMatches: (text: string) => number
   getInstanceCount: (normalizedText: string) => number
 }
@@ -59,6 +60,7 @@ export function PaginatedPdfViewer({
   onSpanAdd,
   onSpanAddAll,
   onSpanAddAllDocuments,
+  onSpanExtend,
   countTextMatches,
   getInstanceCount,
 }: PaginatedPdfViewerProps) {
@@ -267,6 +269,7 @@ export function PaginatedPdfViewer({
             onSpanLabelChangeAll={onSpanLabelChangeAll}
             onSpanLabelChangeAllDocuments={onSpanLabelChangeAllDocuments}
             onSpanAdd={handleSpanAdd(pageModel.pageIndex)}
+            onSpanExtend={onSpanExtend}
             countTextMatches={countTextMatches}
             getInstanceCount={getInstanceCount}
           />

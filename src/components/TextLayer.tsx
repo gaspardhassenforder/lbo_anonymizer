@@ -1,20 +1,27 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type MouseEvent as ReactMouseEvent } from 'react'
-import type { Token, BBox } from '../types'
+import type { Token, BBox, DetectedSpan } from '../types'
 import { pdfToScreen } from '../pdf/geometry'
 
 interface TextLayerProps {
   tokens: Token[]
   pageHeight: number
   scale: number
+  selectedSpan?: DetectedSpan
   onSelectionEnd: (charStart: number, charEnd: number, text: string, anchorRect: DOMRect) => void
+  onAdjacentHover?: (preview: { charStart: number; charEnd: number } | null) => void
+  onExtendSpan?: (charStart: number, charEnd: number) => void
 }
 
-export function TextLayer({ tokens, pageHeight, scale, onSelectionEnd }: TextLayerProps) {
+export function TextLayer({ tokens, pageHeight, scale, selectedSpan, onSelectionEnd, onAdjacentHover, onExtendSpan }: TextLayerProps) {
   const layerRef = useRef<HTMLDivElement>(null)
   const [startIdx, setStartIdx] = useState<number | null>(null)
   const [hoverIdx, setHoverIdx] = useState<number | null>(null)
 
   const isArmed = startIdx !== null
+
+  // Boost z-index above AnnotationLayer when armed (so second click goes to TextLayer, not
+  // AnnotationLayer's stopPropagation) or when a span popover is open (for hover-to-grow).
+  const zIndex = isArmed || !!selectedSpan ? 3 : 1
 
   const reset = useCallback(() => {
     setStartIdx(null)
@@ -102,32 +109,79 @@ export function TextLayer({ tokens, pageHeight, scale, onSelectionEnd }: TextLay
   const handleMouseDown = useCallback((e: ReactMouseEvent) => {
     // Prevent native browser selection (which is flaky with absolutely positioned tokens)
     e.preventDefault()
-  }, [])
+    // When a span popover is open and the user clicks on a token, stop mousedown propagation
+    // so the popover's click-outside handler does not fire. The popover stays open during
+    // hover-to-grow interactions and closes only when clicking on neutral (non-token) space.
+    if (selectedSpan && !isArmed) {
+      const idx = getTokenIdxFromEventTarget(e.target)
+      if (idx !== null) {
+        e.stopPropagation()
+      }
+    }
+  }, [selectedSpan, isArmed, getTokenIdxFromEventTarget])
 
   const handleMouseMove = useCallback((e: ReactMouseEvent) => {
-    if (!isArmed) return
     const idx = getTokenIdxFromEventTarget(e.target)
-    if (idx !== null) setHoverIdx(idx)
-  }, [isArmed, getTokenIdxFromEventTarget])
+    if (isArmed) {
+      if (idx !== null) setHoverIdx(idx)
+      return
+    }
+    if (!selectedSpan || idx === null) return
+    setHoverIdx(idx)
+    if (onAdjacentHover) {
+      const token = tokens[idx]
+      if (token.charEnd <= selectedSpan.charStart) {
+        // Token is fully before the span → preview extending left to this token
+        onAdjacentHover({ charStart: token.charStart, charEnd: selectedSpan.charEnd })
+      } else if (token.charStart >= selectedSpan.charEnd) {
+        // Token is fully after the span → preview extending right to this token
+        onAdjacentHover({ charStart: selectedSpan.charStart, charEnd: token.charEnd })
+      } else {
+        // Token overlaps the span → clear preview
+        onAdjacentHover(null)
+      }
+    }
+  }, [isArmed, selectedSpan, getTokenIdxFromEventTarget, onAdjacentHover, tokens])
+
+  const handleMouseLeave = useCallback(() => {
+    onAdjacentHover?.(null)
+  }, [onAdjacentHover])
 
   const handleClick = useCallback((e: ReactMouseEvent) => {
     const idx = getTokenIdxFromEventTarget(e.target)
     if (idx === null) return
     if (!isArmed) {
+      if (selectedSpan && onExtendSpan) {
+        const token = tokens[idx]
+        if (token.charEnd <= selectedSpan.charStart) {
+          // Extend the span left to include this token
+          onExtendSpan(token.charStart, selectedSpan.charEnd)
+          return
+        }
+        if (token.charStart >= selectedSpan.charEnd) {
+          // Extend the span right to include this token
+          onExtendSpan(selectedSpan.charStart, token.charEnd)
+          return
+        }
+        // Token is inside (or overlapping) the current span — do nothing.
+        // mousedown already stopped propagation, so the popover stays open.
+        return
+      }
       setStartIdx(idx)
       setHoverIdx(idx)
       return
     }
     commitSelection(idx)
-  }, [isArmed, getTokenIdxFromEventTarget, commitSelection])
+  }, [isArmed, selectedSpan, onExtendSpan, getTokenIdxFromEventTarget, commitSelection, tokens])
 
   return (
     <div
       ref={layerRef}
       className="text-layer absolute inset-0"
-      style={{ userSelect: 'none', cursor: 'text', zIndex: 1 }}
+      style={{ userSelect: 'none', cursor: 'text', zIndex }}
       onMouseDown={handleMouseDown}
       onMouseMove={handleMouseMove}
+      onMouseLeave={handleMouseLeave}
       onClick={handleClick}
     >
       {tokens.map((token, idx) => {
