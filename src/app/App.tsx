@@ -7,6 +7,7 @@ import { normalizeEntityLabel } from '../types'
 import { useStore, getInstanceCount, normalizeText } from '../state/store'
 import { loadPdf } from '../pdf/pdfLoader'
 import { propagateEntities } from '../ner/propagate'
+import { getKnownFalsePositiveTexts } from '../ner/knownFalsePositives'
 import { createSpan } from '../tagging/applyEdits'
 import { useModelLoader } from '../hooks/useModelLoader'
 import { processDocumentProgressively } from '../processing/pageProcessor'
@@ -121,7 +122,7 @@ export default function App() {
 
         setSavedDocuments(metas)
         setCorpusRules({
-          suppressedTexts: new Set(rules.suppressedTexts),
+          suppressedTexts: new Set([...getKnownFalsePositiveTexts(), ...rules.suppressedTexts]),
           labelOverrides: new Map(
             rules.labelOverrides.map(([k, v]) => [k, normalizeEntityLabel(v as string)])
           ),
