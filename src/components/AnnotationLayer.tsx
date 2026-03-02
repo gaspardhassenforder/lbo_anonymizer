@@ -16,6 +16,7 @@ interface AnnotationLayerProps {
     label: EntityLabel
   } | null
   onSpanClick: (span: DetectedSpan, event: React.MouseEvent) => void
+  previewAnonymized?: boolean
 }
 
 export function AnnotationLayer({
@@ -25,6 +26,7 @@ export function AnnotationLayer({
   selectedSpanId,
   extensionPreview,
   onSpanClick,
+  previewAnonymized,
 }: AnnotationLayerProps) {
   // Get screen coordinates for a span, merged by line (one highlight per line)
   // Uses partial bboxes to highlight only the entity portion within each token
@@ -91,7 +93,8 @@ export function AnnotationLayer({
                   top: bbox.y,
                   width: bbox.width,
                   height: bbox.height,
-                  backgroundColor: color,
+                  backgroundColor: previewAnonymized ? '#1e293b' : color,
+                  opacity: previewAnonymized ? 1 : undefined,
                   pointerEvents: 'auto',
                   cursor: 'pointer',
                 }}

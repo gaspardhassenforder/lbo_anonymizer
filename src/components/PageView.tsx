@@ -30,6 +30,7 @@ interface PageViewProps {
   onSpanExtend?: (spanId: string, charStart: number, charEnd: number, pageText: string, pageTokens: Token[]) => void
   countTextMatches: (text: string) => number
   getInstanceCount: (normalizedText: string) => number
+  previewAnonymized?: boolean
 }
 
 export function PageView({
@@ -53,6 +54,7 @@ export function PageView({
   onSpanExtend,
   countTextMatches,
   getInstanceCount,
+  previewAnonymized,
 }: PageViewProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const containerRef = useRef<HTMLDivElement>(null)
@@ -279,6 +281,7 @@ export function PageView({
             scale={scale}
             selectedRegionId={selectedRegionId}
             onRegionClick={(region) => handleRegionClick(region)}
+            previewAnonymized={previewAnonymized}
           />
           <AnnotationLayer
             spans={pageSpans}
@@ -287,6 +290,7 @@ export function PageView({
             selectedSpanId={selectedSpanId}
             extensionPreview={extensionPreview}
             onSpanClick={handleSpanClick}
+            previewAnonymized={previewAnonymized}
           />
         </>
       )}

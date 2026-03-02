@@ -34,6 +34,7 @@ interface PaginatedPdfViewerProps {
   onSpanExtend?: (spanId: string, charStart: number, charEnd: number, pageText: string, pageTokens: import('../types').Token[]) => void
   countTextMatches: (text: string) => number
   getInstanceCount: (normalizedText: string) => number
+  previewAnonymized?: boolean
 }
 
 export function PaginatedPdfViewer({
@@ -63,6 +64,7 @@ export function PaginatedPdfViewer({
   onSpanExtend,
   countTextMatches,
   getInstanceCount,
+  previewAnonymized,
 }: PaginatedPdfViewerProps) {
   const { t } = useTranslation()
   // Track loaded PDF page with its index
@@ -272,6 +274,7 @@ export function PaginatedPdfViewer({
             onSpanExtend={onSpanExtend}
             countTextMatches={countTextMatches}
             getInstanceCount={getInstanceCount}
+            previewAnonymized={previewAnonymized}
           />
         </div>
       </div>

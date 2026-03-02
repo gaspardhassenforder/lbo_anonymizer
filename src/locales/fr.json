@@ -40,7 +40,8 @@
     "exportPdf": "Exporter PDF",
     "newFile": "Nouveau fichier",
     "confirmAnonymisation": "Confirmer",
-    "confirmDisabledHint": "{{count}}/{{total}} pages traitées. Veuillez attendre que toutes les pages soient traitées avant de confirmer."
+    "confirmDisabledHint": "{{count}}/{{total}} pages traitées. Veuillez attendre que toutes les pages soient traitées avant de confirmer.",
+    "previewAnonymized": "Aperçu"
   },
   "documents": {
     "title": "Vos Documents",

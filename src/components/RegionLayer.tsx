@@ -8,6 +8,7 @@ interface RegionLayerProps {
   scale: number
   selectedRegionId: string | null
   onRegionClick: (region: RedactionRegion) => void
+  previewAnonymized?: boolean
 }
 
 export function RegionLayer({
@@ -16,6 +17,7 @@ export function RegionLayer({
   scale,
   selectedRegionId,
   onRegionClick,
+  previewAnonymized,
 }: RegionLayerProps) {
   const toScreen = (bbox: BBox) => pdfToScreen(bbox, pageHeight, scale)
 
@@ -39,7 +41,8 @@ export function RegionLayer({
               top: bbox.y,
               width: bbox.width,
               height: bbox.height,
-              backgroundColor: color,
+              backgroundColor: previewAnonymized ? '#1e293b' : color,
+              opacity: previewAnonymized ? 1 : undefined,
               pointerEvents: 'auto',
               cursor: 'pointer',
             }}

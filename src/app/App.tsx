@@ -36,6 +36,7 @@ export default function App() {
   const [loadingDocument, setLoadingDocument] = useState(false)
   const [processingFromLocationState, setProcessingFromLocationState] = useState(false)
   const [showEditorHelp, setShowEditorHelp] = useState(false)
+  const [previewAnonymized, setPreviewAnonymized] = useState(false)
   const [showSelectHint, setShowSelectHint] = useState(
     () => (typeof window !== 'undefined' ? !localStorage.getItem('lbo-anonymizer-select-hint-dismissed') : true)
   )
@@ -982,6 +983,8 @@ export default function App() {
         onConfirmAnonymisation={handleConfirmAnonymisation}
         onToggleLanguage={toggleLanguage}
         currentLanguage={i18n.language}
+        previewAnonymized={previewAnonymized}
+        onTogglePreview={() => setPreviewAnonymized(v => !v)}
       />
 
       {/* Main content */}
@@ -1025,6 +1028,7 @@ export default function App() {
                 onSpanAddAllDocuments={handleSpanAddAllDocuments}
                 countTextMatches={countTextMatches}
                 getInstanceCount={getInstanceCount}
+                previewAnonymized={previewAnonymized}
               />
             )}
           </div>
