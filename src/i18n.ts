@@ -11,7 +11,7 @@ const getSavedLanguage = (): string => {
   }
   // Detect from browser
   const browserLang = navigator.language.split('-')[0]
-  return browserLang === 'fr' ? 'fr' : 'en'
+  return browserLang === 'en' ? 'en' : 'fr'
 }
 
 i18n
@@ -22,7 +22,7 @@ i18n
       fr: { translation: fr },
     },
     lng: getSavedLanguage(),
-    fallbackLng: 'en',
+    fallbackLng: 'fr',
     interpolation: {
       escapeValue: false,
     },
