@@ -583,7 +583,10 @@ export const useStore = create<AppState>()(
       }),
 
       setCurrentPage: (page) => set((state) => {
-        state.currentPage = Math.max(0, Math.min(page, state.pages.length - 1))
+        const maxPage = state.totalPageCount > 0
+          ? state.totalPageCount - 1
+          : state.pages.length > 0 ? state.pages.length - 1 : 0
+        state.currentPage = Math.max(0, Math.min(page, maxPage))
       }),
 
       setDirty: (dirty) => set((state) => {
