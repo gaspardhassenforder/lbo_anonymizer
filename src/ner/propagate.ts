@@ -117,7 +117,6 @@ export function findAllOccurrences(
 
   // If exact matching found results, return them
   if (occurrences.length > 0) {
-    console.log(`[findAllOccurrences] Found ${occurrences.length} exact matches for "${searchText}"`)
     return occurrences
   }
 
@@ -138,10 +137,7 @@ export function findAllOccurrences(
     if (similarity >= FUZZY_MATCH_THRESHOLD) {
       // Get tight bounds that exclude surrounding markdown
       const tightBounds = getTightBounds(pageText, rawStart, rawEnd, searchText)
-      console.log(`[findAllOccurrences] Flex pattern matched "${matchedText}" for "${searchText}" (similarity=${similarity.toFixed(2)})`)
       occurrences.push(tightBounds)
-    } else {
-      console.log(`[findAllOccurrences] Flex pattern rejected "${matchedText}" for "${searchText}" (similarity=${similarity.toFixed(2)} < ${FUZZY_MATCH_THRESHOLD})`)
     }
 
     // Prevent infinite loop on zero-length matches
@@ -216,12 +212,6 @@ function buildUniqueEntitiesFuzzy(spans: DetectedSpan[]): UniqueEntity[] {
         source: span.source,
       })
     }
-  }
-
-  // Debug: log unique entities
-  console.log(`[Propagation] Built ${entities.length} unique entities:`)
-  for (const e of entities) {
-    console.log(`  - "${e.text}" (${e.label}) with ${e.variants.size} variants: [${[...e.variants].join(', ')}]`)
   }
 
   return entities
@@ -349,7 +339,6 @@ export function propagateEntitiesForPage(
 
           // Skip if this text is suppressed by user
           if (suppressedTexts?.has(normalizedActualText)) {
-            console.log(`[Propagation] Skipping suppressed text "${actualText}" on page ${newPage.pageIndex}`)
             continue
           }
 

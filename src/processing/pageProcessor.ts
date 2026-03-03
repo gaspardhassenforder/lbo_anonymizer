@@ -66,23 +66,19 @@ export async function processPage(
   },
   userDecisions?: UserDecisions
 ): Promise<PageProcessingResult> {
-  console.log(`[PageProcessor] Starting page ${pageIndex}`)
   const page = await getPdfPage(document, pageIndex)
-  console.log(`[PageProcessor] Got PDF page ${pageIndex}`)
 
   // Tier-1 signature detection from PDF annotations (widgets/fields)
   const regions = await detectSignatureAnnotationRegions(page, pageIndex)
 
   // Extract initial text structure
   let pageModel = await extractPageText(page, pageIndex)
-  console.log(`[PageProcessor] Extracted text for page ${pageIndex}`)
 
   // Render page for OCR
   const { canvas } = await renderPage(page, 2)
   const imageData = getCanvasImageData(canvas)
 
   // Run OCR to get accurate word-level bounding boxes
-  console.log(`[PageProcessor] Starting OCR for page ${pageIndex}`)
   const ocrResult = await ocrClient.recognize(
     imageData,
     pageIndex,
@@ -90,7 +86,6 @@ export async function processPage(
     pageModel.height,
     callbacks?.onOcrProgress
   )
-  console.log(`[PageProcessor] OCR complete for page ${pageIndex}, got ${ocrResult.tokens.length} tokens`)
 
   pageModel = {
     ...pageModel,
@@ -100,13 +95,11 @@ export async function processPage(
   }
 
   // Run NER detection on this page
-  console.log(`[PageProcessor] Starting NER for page ${pageIndex}`)
   let pageSpans = await nerClient.detect(
     pageModel.text,
     pageModel.pageIndex,
     pageModel.tokens
   )
-  console.log(`[PageProcessor] NER complete for page ${pageIndex}, found ${pageSpans.length} spans`)
 
   // Apply user decisions (suppressions and label overrides)
   if (userDecisions && (userDecisions.suppressedTexts.size > 0 || userDecisions.labelOverrides.size > 0)) {
@@ -133,9 +126,6 @@ export async function processPage(
       )?.tokens || [],
     }))
 
-    if (pageSpans.length !== originalCount) {
-      console.log(`[PageProcessor] Applied user decisions: ${originalCount} -> ${pageSpans.length} spans`)
-    }
   }
 
   // Apply forced labels: add spans for matching text occurrences (corpus-wide rules)
@@ -204,7 +194,6 @@ export async function processPageWithoutNER(
     onOcrProgress?: (progress: number) => void
   }
 ): Promise<PageModel> {
-  console.log(`[PageProcessor] Starting page ${pageIndex} (no NER)`)
   const page = await getPdfPage(document, pageIndex)
 
   // Extract initial text structure
@@ -215,7 +204,6 @@ export async function processPageWithoutNER(
   const imageData = getCanvasImageData(canvas)
 
   // Run OCR to get accurate word-level bounding boxes
-  console.log(`[PageProcessor] Starting OCR for page ${pageIndex}`)
   const ocrResult = await ocrClient.recognize(
     imageData,
     pageIndex,
@@ -223,7 +211,6 @@ export async function processPageWithoutNER(
     pageModel.height,
     callbacks?.onOcrProgress
   )
-  console.log(`[PageProcessor] OCR complete for page ${pageIndex}, got ${ocrResult.tokens.length} tokens`)
 
   pageModel = {
     ...pageModel,
@@ -306,7 +293,6 @@ export async function processDocumentProgressively(
   }
 
   // Process page 0 first
-  console.log('[Progressive] Starting page 0')
   callbacks.onPageStart?.(0)
 
   try {
@@ -317,14 +303,12 @@ export async function processDocumentProgressively(
       onOcrProgress: (progress) => callbacks.onOcrProgress?.(0, progress),
     }, userDecisions)
 
-    console.log('[Progressive] Page 0 complete, calling onPageComplete')
     allPages.push(firstResult.pageModel)
     allSpans.push(...firstResult.spans)
 
     callbacks.onPageComplete?.(0, firstResult)
 
     // Signal that first page is ready - UI can now show it
-    console.log('[Progressive] Calling onFirstPageReady')
     callbacks.onFirstPageReady?.()
 
     // Process remaining pages

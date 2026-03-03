@@ -47,13 +47,10 @@ export async function detectSignatureAnnotationRegions(
 ): Promise<RedactionRegion[]> {
   const annotations = (await page.getAnnotations()) as unknown as PdfJsAnnotation[]
   const regions: RedactionRegion[] = []
-  let signatureLikeCount = 0
 
   for (let i = 0; i < annotations.length; i++) {
     const a = annotations[i]
-    const sigLike = isSignatureLikeAnnot(a)
-    if (sigLike) signatureLikeCount++
-    if (!a?.rect || !sigLike) continue
+    if (!a?.rect || !isSignatureLikeAnnot(a)) continue
 
     const bbox = rectToBBox(a.rect)
     if (bbox.width <= 0 || bbox.height <= 0) continue
@@ -66,38 +63,6 @@ export async function detectSignatureAnnotationRegions(
       source: 'pdf-annotation',
       kind: 'signature',
     })
-  }
-
-  // Debug logging: show whether we detected any signature widgets and why not.
-  // This helps distinguish “no signature annotations exist” vs “signature exists but uses a different annotation schema”.
-  if (annotations.length > 0 || regions.length > 0) {
-    console.log('[SignatureAnnotations] Detection summary', {
-      pageIndex,
-      annotationCount: annotations.length,
-      signatureLikeCount,
-      detectedRegions: regions.length,
-    })
-
-    if (regions.length > 0) {
-      console.log(
-        '[SignatureAnnotations] Detected regions',
-        regions.map((r) => ({ pageIndex: r.pageIndex, bbox: r.bbox, label: r.label, source: r.source, kind: r.kind }))
-      )
-    } else if (annotations.length > 0) {
-      // Log a compact view of the annotations so we can tune matching rules.
-      const compact = annotations.slice(0, 10).map((a, idx) => ({
-        idx,
-        subtype: a.subtype,
-        fieldType: a.fieldType,
-        fieldName: a.fieldName,
-        annotationType: a.annotationType,
-        hasRect: !!a.rect,
-        rect: a.rect,
-        contentsPreview: typeof a.contents === 'string' ? a.contents.slice(0, 80) : undefined,
-        keys: Object.keys(a).slice(0, 20),
-      }))
-      console.log('[SignatureAnnotations] No regions detected. Annotation samples', compact)
-    }
   }
 
   return regions

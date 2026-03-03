@@ -242,13 +242,10 @@ export class GlinerModel {
           const mappedLabel = LABEL_MAP[pred.label.toLowerCase()] || 'PERSON'
           const entityText = pred.spanText
 
-          console.log(`[GLiNER] Detected: "${entityText}" (${mappedLabel}) score=${pred.score.toFixed(3)}`)
-
           // Map model span back to ORIGINAL text (model saw cleaned text).
           // 1) Exact match
           const originalIndex = text.indexOf(entityText)
           if (originalIndex !== -1) {
-            console.log(`[GLiNER]   → Mapped via exact match at ${originalIndex}`)
             results.push({
               label: mappedLabel,
               text: entityText,
@@ -264,7 +261,6 @@ export class GlinerModel {
           const lowerEntity = entityText.toLowerCase()
           const lowerIndex = lowerText.indexOf(lowerEntity)
           if (lowerIndex !== -1) {
-            console.log(`[GLiNER]   → Mapped via case-insensitive match at ${lowerIndex}`)
             results.push({
               label: mappedLabel,
               text: text.slice(lowerIndex, lowerIndex + entityText.length),
@@ -278,7 +274,6 @@ export class GlinerModel {
           // 3) Normalized match (punctuation/whitespace may differ after cleaning)
           const normalized = findNormalizedMatch(text, entityText)
           if (normalized) {
-            console.log(`[GLiNER]   → Mapped via normalized match at ${normalized.start}-${normalized.end}: "${normalized.text}"`)
             results.push({
               label: mappedLabel,
               text: normalized.text,
@@ -315,13 +310,7 @@ export class GlinerModel {
     }
 
     // Filter out false positives before returning
-    const filtered = results.filter(result => {
-      if (shouldExcludeSpan(result.text, result.label)) {
-        console.log(`[GLiNER] Excluded false positive: "${result.text}" (${result.label})`)
-        return false
-      }
-      return true
-    })
+    const filtered = results.filter(result => !shouldExcludeSpan(result.text, result.label))
 
     return filtered
   }

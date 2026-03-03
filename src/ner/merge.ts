@@ -151,12 +151,6 @@ export function processSpans(
   return merged.map((span, index) => {
     const matchedTokens = findTokensInRange(tokens, span.charStart, span.charEnd)
 
-    // Debug: log what tokens are matched for each span with bbox info
-    console.log(`[Span] "${span.text}" (${span.charStart}-${span.charEnd}) matched ${matchedTokens.length} tokens:`)
-    matchedTokens.forEach(t => {
-      console.log(`  "${t.text}" chars ${t.charStart}-${t.charEnd}, bbox: x=${t.bbox.x.toFixed(1)} w=${t.bbox.width.toFixed(1)}`)
-    })
-
     return {
       ...span,
       id: `span-${pageIndex}-${index}-${Date.now()}`,
