@@ -103,7 +103,6 @@ export async function processPage(
 
   // Apply user decisions (suppressions and label overrides)
   if (userDecisions && (userDecisions.suppressedTexts.size > 0 || userDecisions.labelOverrides.size > 0)) {
-    const originalCount = pageSpans.length
     pageSpans = applyUserDecisions(
       pageSpans.map(s => ({
         label: s.label,

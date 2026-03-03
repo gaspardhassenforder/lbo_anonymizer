@@ -115,6 +115,7 @@ export interface ProcessingProgress {
 // OCR Worker messages
 export interface OcrWorkerRequest {
   type: 'INIT' | 'RECOGNIZE' | 'TERMINATE'
+  requestId?: string
   imageData?: ImageData
   pageIndex?: number
   pageWidth?: number
@@ -125,6 +126,7 @@ export interface OcrWorkerRequest {
 
 export interface OcrWorkerResponse {
   type: 'INIT_COMPLETE' | 'INIT_ERROR' | 'PROGRESS' | 'RESULT' | 'ERROR'
+  requestId?: string
   progress?: number
   tokens?: Token[]
   text?: string
@@ -135,6 +137,7 @@ export interface OcrWorkerResponse {
 // NER Worker messages
 export interface NerWorkerRequest {
   type: 'LOAD_MODEL' | 'DETECT'
+  requestId?: string
   text?: string
   pageIndex?: number
   tokens?: Token[]
@@ -142,6 +145,8 @@ export interface NerWorkerRequest {
 
 export interface NerWorkerResponse {
   type: 'MODEL_LOADING' | 'MODEL_LOADED' | 'MODEL_ERROR' | 'DETECTION_RESULT' | 'DETECTION_ERROR'
+  requestId?: string
+  pageIndex?: number
   progress?: number
   spans?: Array<Omit<DetectedSpan, 'id' | 'tokens'>>
   error?: string

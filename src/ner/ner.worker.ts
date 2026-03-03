@@ -61,6 +61,7 @@ async function loadModel(): Promise<void> {
 }
 
 async function detect(
+  requestId: string,
   text: string,
   pageIndex: number,
   tokens: Token[]
@@ -102,11 +103,14 @@ async function detect(
 
     self.postMessage({
       type: 'DETECTION_RESULT',
+      requestId,
+      pageIndex,
       spans,
     } satisfies NerWorkerResponse)
   } catch (error) {
     self.postMessage({
       type: 'DETECTION_ERROR',
+      requestId,
       error: error instanceof Error ? error.message : 'Detection failed',
     } satisfies NerWorkerResponse)
   }
@@ -123,8 +127,8 @@ self.onmessage = async (e: MessageEvent<NerWorkerRequest>) => {
         break
 
       case 'DETECT':
-        if (request.text !== undefined && request.pageIndex !== undefined) {
-          await detect(request.text, request.pageIndex, request.tokens ?? [])
+        if (request.requestId != null && request.text !== undefined && request.pageIndex !== undefined) {
+          await detect(request.requestId, request.text, request.pageIndex, request.tokens ?? [])
         }
         break
     }

@@ -19,6 +19,7 @@ async function initWorker(): Promise<void> {
 }
 
 async function recognize(
+  requestId: string,
   imageData: ImageData,
   pageIndex: number,
   pdfWidth: number,
@@ -84,6 +85,7 @@ async function recognize(
 
   self.postMessage({
     type: 'RESULT',
+    requestId,
     tokens,
     text: fullText,
     pageIndex,
@@ -110,8 +112,8 @@ self.onmessage = async (e: MessageEvent<OcrWorkerRequest>) => {
 
       case 'RECOGNIZE':
         await initWorker()
-        if (request.imageData && request.pageIndex !== undefined && request.pdfWidth !== undefined && request.pdfHeight !== undefined) {
-          await recognize(request.imageData, request.pageIndex, request.pdfWidth, request.pdfHeight)
+        if (request.requestId != null && request.imageData && request.pageIndex !== undefined && request.pdfWidth !== undefined && request.pdfHeight !== undefined) {
+          await recognize(request.requestId, request.imageData, request.pageIndex, request.pdfWidth, request.pdfHeight)
         }
         break
 
@@ -120,8 +122,10 @@ self.onmessage = async (e: MessageEvent<OcrWorkerRequest>) => {
         break
     }
   } catch (error) {
+    const requestId = e.data?.type === 'RECOGNIZE' ? (e.data as OcrWorkerRequest).requestId : undefined
     self.postMessage({
       type: 'ERROR',
+      requestId,
       error: error instanceof Error ? error.message : 'Unknown error',
     } satisfies OcrWorkerResponse)
   }

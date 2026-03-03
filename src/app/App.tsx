@@ -12,6 +12,7 @@ import { createSpan } from '../tagging/applyEdits'
 import { useModelLoader } from '../hooks/useModelLoader'
 import { processDocumentProgressively } from '../processing/pageProcessor'
 import type { ResumeOptions } from '../processing/pageProcessor'
+import { ocrClient } from '../ocr/ocrClient'
 import { storePdf, loadPdf as loadStoredPdf, clearPdf, arrayBufferToFile } from '../state/pdfPersistence'
 import {
   deleteDocumentData,
@@ -49,6 +50,8 @@ export default function App() {
   const hasTriedLoadDocument = useRef(false)
   const hasProcessedLocationState = useRef(false)
   const hasShownHelpThisSession = useRef(false)
+  /** Session id for the current document processing; callbacks ignore work if it no longer matches (e.g. user switched document). */
+  const processingSessionIdRef = useRef<string | null>(null)
 
   // Model loading hook (loads OCR + NER on app mount)
   // Note: modelsReady and modelLoadingProgress are used in the upload modal on DocumentListPage
@@ -73,7 +76,6 @@ export default function App() {
   const getSavedDocument = useStore((state) => state.getSavedDocument)
   const setSavedDocuments = useStore((state) => state.setSavedDocuments)
   const addSavedDocument = useStore((state) => state.addSavedDocument)
-  const removeSavedDocument = useStore((state) => state.removeSavedDocument)
   const updateSavedDocument = useStore((state) => state.updateSavedDocument)
 
   // Store actions
@@ -303,10 +305,43 @@ export default function App() {
         const pdfFile = new File([savedData.pdfData], originalName, { type: 'application/pdf' })
 
         const isDraft = savedMeta?.isDraft ?? false
-        const parsedPages = Array.isArray(storedPages) ? storedPages : []
-        const normalizedEntities = Array.isArray(entities)
+
+        // Normalize persisted state: dedupe/sort pages by pageIndex, filter to valid range [0, numPages-1]
+        const rawPages = Array.isArray(storedPages) ? storedPages : []
+        const validPageIndices = new Set(
+          rawPages
+            .filter((p: { pageIndex?: number }) => typeof p?.pageIndex === 'number' && p.pageIndex >= 0 && p.pageIndex < numPages)
+            .map((p: { pageIndex: number }) => p.pageIndex)
+        )
+        const parsedPages: typeof pages = rawPages
+          .filter((p: { pageIndex?: number }) => validPageIndices.has(p?.pageIndex ?? -1))
+          .reduce((acc: typeof pages, p: (typeof pages)[0]) => {
+            if (acc.some((existing) => existing.pageIndex === p.pageIndex)) return acc
+            acc.push(p)
+            return acc
+          }, [] as typeof pages)
+          .sort((a, b) => a.pageIndex - b.pageIndex)
+
+        const rawEntities = Array.isArray(entities)
           ? entities.map((s) => ({ ...s, label: normalizeEntityLabel(s.label) }))
           : []
+        const normalizedEntities = rawEntities.filter(
+          (s) => typeof s.pageIndex === 'number' && s.pageIndex >= 0 && s.pageIndex < numPages
+        )
+
+        const rawRegions = Array.isArray(storedRegions)
+          ? storedRegions.map((r) => ({ ...r, label: normalizeEntityLabel(r.label) }))
+          : []
+        const normalizedRegions = rawRegions.filter(
+          (r) => typeof r.pageIndex === 'number' && r.pageIndex >= 0 && r.pageIndex < numPages
+        )
+
+        // Resume from the first index not yet present (max present pageIndex + 1), not from array length
+        const maxPresentPageIndex = parsedPages.length === 0 ? -1 : Math.max(...parsedPages.map((p) => p.pageIndex))
+        const resumeFromPage = isDraft ? Math.min(maxPresentPageIndex + 1, numPages) : numPages
+
+        // Reject any in-flight OCR from a previous document so results are not applied to this one
+        ocrClient.rejectAllPending()
 
         // Reset state and hydrate saved data
         reset()
@@ -323,24 +358,15 @@ export default function App() {
 
         setPages(parsedPages)
         setSpans(normalizedEntities)
-        setRegions(
-          Array.isArray(storedRegions)
-            ? storedRegions.map((r) => ({ ...r, label: normalizeEntityLabel(r.label) }))
-            : []
-        )
-
-        const resumeFromPage = isDraft ? parsedPages.length : numPages
+        setRegions(normalizedRegions)
 
         if (isDraft && resumeFromPage < numPages) {
-          // Draft with remaining pages: show full PDF, mark saved pages ready,
+          // Draft with remaining pages: show full PDF, mark saved pages ready by actual pageIndex,
           // queue remaining pages as pending, then resume processing in background.
           setDirty(true)
           setTotalPageCount(numPages)
-          for (let i = 0; i < resumeFromPage; i++) {
-            setPageProcessingStatus(i, 'ready')
-          }
-          for (let i = resumeFromPage; i < numPages; i++) {
-            setPageProcessingStatus(i, 'pending')
+          for (let i = 0; i < numPages; i++) {
+            setPageProcessingStatus(i, validPageIndices.has(i) ? 'ready' : 'pending')
           }
 
           // Clear URL param before kicking off background work
@@ -353,13 +379,18 @@ export default function App() {
             seedSpans: normalizedEntities,
           }
 
+          const sessionId = `session_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`
+          processingSessionIdRef.current = sessionId
+
           // Fire-and-forget: resume processing remaining pages
           processDocumentProgressively(pdfDoc, numPages, {
             onPageStart: (pageIndex) => {
+              if (processingSessionIdRef.current !== sessionId) return
               setPageProcessingStatus(pageIndex, 'processing')
             },
             onOcrProgress: () => {},
             onPageComplete: (pageIndex, result) => {
+              if (processingSessionIdRef.current !== sessionId) return
               addPage(result.pageModel)
               addPageSpans(result.spans)
               addPageRegions(result.regions)
@@ -367,6 +398,7 @@ export default function App() {
 
               // Auto-save draft every 10 pages
               if ((pageIndex + 1) % 10 === 0) {
+                if (processingSessionIdRef.current !== sessionId) return
                 const s = useStore.getState()
                 const now = new Date().toISOString()
                 const draftMeta = {
@@ -391,13 +423,16 @@ export default function App() {
               }
             },
             onPageError: (pageIndex, error) => {
+              if (processingSessionIdRef.current !== sessionId) return
               console.error(`Error resuming page ${pageIndex}:`, error)
               setPageProcessingStatus(pageIndex, 'error')
             },
             onFirstPageReady: () => {
+              if (processingSessionIdRef.current !== sessionId) return
               setProcessing({ stage: 'ready', progress: 100, message: '' })
             },
             onAllPagesComplete: (allSpans, allPages) => {
+              if (processingSessionIdRef.current !== sessionId) return
               const finalPropagated = propagateEntities(allSpans, allPages)
               if (finalPropagated.length > 0) {
                 addSpans(finalPropagated)
@@ -455,6 +490,9 @@ export default function App() {
       }
     }
 
+    // Reject any in-flight OCR from a previous document so results are not applied to this one
+    ocrClient.rejectAllPending()
+
     // New document: clear previous editor state and assign draft ID immediately
     reset()
     const draftId = `doc_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
@@ -505,9 +543,13 @@ export default function App() {
       // Track whether first page is ready (to stop showing overlay)
       let firstPageReady = false
 
+      const sessionId = `session_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`
+      processingSessionIdRef.current = sessionId
+
       // Process document progressively
       await processDocumentProgressively(document, numPages, {
         onPageStart: (pageIndex) => {
+          if (processingSessionIdRef.current !== sessionId) return
           setPageProcessingStatus(pageIndex, 'processing')
           // Only update overlay for page 0
           if (pageIndex === 0) {
@@ -520,6 +562,7 @@ export default function App() {
         },
 
         onOcrProgress: (pageIndex, progress) => {
+          if (processingSessionIdRef.current !== sessionId) return
           // Only show OCR progress for page 0
           if (pageIndex === 0 && !firstPageReady) {
             setProcessing({
@@ -531,6 +574,7 @@ export default function App() {
         },
 
         onPageComplete: (pageIndex, result) => {
+          if (processingSessionIdRef.current !== sessionId) return
           // Add page model to store
           addPage(result.pageModel)
 
@@ -545,6 +589,7 @@ export default function App() {
 
           // Auto-save draft every 10 pages (fire-and-forget)
           if (pdfArrayBuffer && (pageIndex + 1) % 10 === 0) {
+            if (processingSessionIdRef.current !== sessionId) return
             const s = useStore.getState()
             const now = new Date().toISOString()
             const draftMeta = {
@@ -570,11 +615,13 @@ export default function App() {
         },
 
         onPageError: (pageIndex, error) => {
+          if (processingSessionIdRef.current !== sessionId) return
           console.error(`Error processing page ${pageIndex}:`, error)
           setPageProcessingStatus(pageIndex, 'error')
         },
 
         onFirstPageReady: () => {
+          if (processingSessionIdRef.current !== sessionId) return
           firstPageReady = true
           // User can now see and interact with first page
           setProcessing({
@@ -585,6 +632,7 @@ export default function App() {
         },
 
         onAllPagesComplete: (allSpans, allPages) => {
+          if (processingSessionIdRef.current !== sessionId) return
           // Run final cross-page propagation to find entities from later pages on earlier pages
           const finalPropagated = propagateEntities(allSpans, allPages)
 

@@ -8,10 +8,15 @@ interface OcrResult {
   pageIndex: number
 }
 
+interface PendingOcr {
+  resolve: (result: OcrResult) => void
+  reject: (error: Error) => void
+  progressCallback: ProgressCallback | null
+}
+
 class OcrClient {
   private worker: Worker | null = null
-  private pendingResolve: ((result: OcrResult) => void) | null = null
-  private pendingReject: ((error: Error) => void) | null = null
+  private pendingByRequestId: Map<string, PendingOcr> = new Map()
   private progressCallback: ProgressCallback | null = null
   private initialized = false
 
@@ -28,15 +33,22 @@ class OcrClient {
     }
 
     this.worker.onerror = (e) => {
-      if (this.pendingReject) {
-        this.pendingReject(new Error(e.message))
-        this.pendingResolve = null
-        this.pendingReject = null
+      for (const [, pending] of this.pendingByRequestId) {
+        pending.reject(new Error(e.message))
       }
+      this.pendingByRequestId.clear()
     }
 
     await this.sendMessage({ type: 'INIT' })
     this.initialized = true
+  }
+
+  /** Reject all pending OCR requests (e.g. when switching document so stale results are not applied). */
+  rejectAllPending(): void {
+    for (const [, pending] of this.pendingByRequestId) {
+      pending.reject(new Error('OCR cancelled (document changed)'))
+    }
+    this.pendingByRequestId.clear()
   }
 
   private handleMessage(response: OcrWorkerResponse): void {
@@ -51,27 +63,38 @@ class OcrClient {
         }
         break
 
-      case 'RESULT':
-        if (this.pendingResolve && response.tokens && response.text !== undefined && response.pageIndex !== undefined) {
-          this.pendingResolve({
-            tokens: response.tokens,
-            text: response.text,
-            pageIndex: response.pageIndex,
-          })
-          this.pendingResolve = null
-          this.pendingReject = null
-          this.progressCallback = null
+      case 'RESULT': {
+        const requestId = response.requestId
+        if (requestId !== undefined) {
+          const pending = this.pendingByRequestId.get(requestId)
+          if (pending && response.tokens && response.text !== undefined && response.pageIndex !== undefined) {
+            pending.resolve({
+              tokens: response.tokens,
+              text: response.text,
+              pageIndex: response.pageIndex,
+            })
+            this.pendingByRequestId.delete(requestId)
+          }
         }
         break
+      }
 
-      case 'ERROR':
-        if (this.pendingReject) {
-          this.pendingReject(new Error(response.error))
-          this.pendingResolve = null
-          this.pendingReject = null
-          this.progressCallback = null
+      case 'ERROR': {
+        const requestId = response.requestId
+        if (requestId !== undefined) {
+          const pending = this.pendingByRequestId.get(requestId)
+          if (pending) {
+            pending.reject(new Error(response.error))
+            this.pendingByRequestId.delete(requestId)
+          }
+        } else {
+          for (const [, pending] of this.pendingByRequestId) {
+            pending.reject(new Error(response.error))
+          }
+          this.pendingByRequestId.clear()
         }
         break
+      }
     }
   }
 
@@ -82,23 +105,13 @@ class OcrClient {
         return
       }
 
-      const originalResolve = this.pendingResolve
-      const originalReject = this.pendingReject
-
-      this.pendingResolve = () => resolve()
-      this.pendingReject = reject
-
-      // Restore original handlers after init
+      // Init does not use pendingByRequestId
       if (request.type === 'INIT') {
         const handler = (e: MessageEvent<OcrWorkerResponse>) => {
           if (e.data.type === 'INIT_COMPLETE') {
             resolve()
-            this.pendingResolve = originalResolve
-            this.pendingReject = originalReject
-          } else if (e.data.type === 'ERROR') {
+          } else if (e.data.type === 'INIT_ERROR' || e.data.type === 'ERROR') {
             reject(new Error(e.data.error))
-            this.pendingResolve = originalResolve
-            this.pendingReject = originalReject
           }
         }
         this.worker.addEventListener('message', handler, { once: true })
@@ -119,14 +132,18 @@ class OcrClient {
       await this.init()
     }
 
-    this.progressCallback = onProgress || null
-
+    const requestId = `ocr_${Date.now()}_${Math.random().toString(36).slice(2, 11)}`
     return new Promise((resolve, reject) => {
-      this.pendingResolve = resolve
-      this.pendingReject = reject
+      this.pendingByRequestId.set(requestId, {
+        resolve,
+        reject,
+        progressCallback: onProgress || null,
+      })
+      this.progressCallback = onProgress || null
 
       this.worker!.postMessage({
         type: 'RECOGNIZE',
+        requestId,
         imageData,
         pageIndex,
         pdfWidth,
