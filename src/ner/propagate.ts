@@ -285,8 +285,6 @@ export function propagateEntities(
     }
   }
 
-  console.log(`[Propagation] Created ${propagatedSpans.length} new spans from ${uniqueEntities.length} unique entities (95% fuzzy grouping)`)
-
   return propagatedSpans
 }
 
@@ -367,10 +365,6 @@ export function propagateEntitiesForPage(
         }
       }
     }
-  }
-
-  if (propagatedSpans.length > 0) {
-    console.log(`[Propagation] Created ${propagatedSpans.length} new spans on page ${newPage.pageIndex} from ${uniqueEntities.length} unique entities (95% fuzzy grouping)`)
   }
 
   return propagatedSpans
