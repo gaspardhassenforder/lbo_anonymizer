@@ -10,6 +10,7 @@ export interface Document {
   pageCount: number
   entityCount: number
   createdAt: string
+  isDraft?: boolean
 }
 
 interface DocumentCardProps {
@@ -110,6 +111,11 @@ export function DocumentCard({ document, onView, onDownload, onDelete, onRename,
           )}
           <p className="text-xs text-slate-500">{formatDate(document.createdAt)}</p>
         </div>
+        {document.isDraft && (
+          <span className="ml-auto text-xs font-medium px-2 py-0.5 rounded-full bg-amber-100 text-amber-700 flex-shrink-0">
+            {t('documents.draft')}
+          </span>
+        )}
       </div>
 
       {/* Stats */}

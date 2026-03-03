@@ -235,22 +235,75 @@ export async function processPageWithoutNER(
   return pageModel
 }
 
+export interface ResumeOptions {
+  /** Index of the first page that still needs processing (pages before this are already done). */
+  startPage: number
+  /** Already-processed page models to seed cross-page propagation. */
+  seedPages: PageModel[]
+  /** Already-detected spans to seed cross-page propagation. */
+  seedSpans: DetectedSpan[]
+}
+
 /**
  * Process document progressively, page by page.
  * - Process page 0 first and call onFirstPageReady when done
  * - Then process remaining pages, calling onPageComplete for each
  * - Finally run cross-page propagation and call onAllPagesComplete
  *
+ * Pass `resumeOptions` to resume from a mid-document draft (startPage > 0).
+ * In that case onFirstPageReady fires immediately and processing begins at startPage.
+ *
  * @param getUserDecisions - Optional function to get current user decisions (for dynamic updates)
+ * @param resumeOptions    - Optional resume state from a saved draft
  */
 export async function processDocumentProgressively(
   document: PDFDocumentProxy,
   numPages: number,
   callbacks: ProcessingCallbacks,
-  getUserDecisions?: () => UserDecisions
+  getUserDecisions?: () => UserDecisions,
+  resumeOptions?: ResumeOptions
 ): Promise<void> {
-  const allPages: PageModel[] = []
-  const allSpans: DetectedSpan[] = []
+  const startPage = resumeOptions?.startPage ?? 0
+  const allPages: PageModel[] = resumeOptions?.seedPages ? [...resumeOptions.seedPages] : []
+  const allSpans: DetectedSpan[] = resumeOptions?.seedSpans ? [...resumeOptions.seedSpans] : []
+
+  if (startPage > 0) {
+    // Already-processed pages are in the store — signal first-page-ready immediately
+    callbacks.onFirstPageReady?.()
+
+    for (let i = startPage; i < numPages; i++) {
+      callbacks.onPageStart?.(i)
+      try {
+        const latestUserDecisions = getUserDecisions?.()
+        const result = await processPage(document, i, {
+          onOcrProgress: (progress) => callbacks.onOcrProgress?.(i, progress),
+        }, latestUserDecisions)
+
+        allPages.push(result.pageModel)
+
+        const propagatedToThisPage = propagateEntitiesForPage(
+          allSpans,
+          result.pageModel,
+          latestUserDecisions?.suppressedTexts,
+          latestUserDecisions?.labelOverrides
+        )
+
+        const pageSpansWithPropagation = [...result.spans, ...propagatedToThisPage]
+        allSpans.push(...pageSpansWithPropagation)
+
+        callbacks.onPageComplete?.(i, {
+          pageModel: result.pageModel,
+          spans: pageSpansWithPropagation,
+          regions: result.regions,
+        })
+      } catch (error) {
+        callbacks.onPageError?.(i, error instanceof Error ? error : new Error(String(error)))
+      }
+    }
+
+    callbacks.onAllPagesComplete?.(allSpans, allPages)
+    return
+  }
 
   // Process page 0 first
   console.log('[Progressive] Starting page 0')

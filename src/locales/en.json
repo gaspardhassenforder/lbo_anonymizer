@@ -70,7 +70,8 @@
     "downloadError": "Failed to download document",
     "generating": "Generating...",
     "deleteError": "Failed to delete document",
-    "renameError": "Failed to rename document"
+    "renameError": "Failed to rename document",
+    "draft": "Draft"
   },
   "sidebar": {
     "title": "Detected Entities",

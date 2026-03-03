@@ -15,6 +15,7 @@ export interface DocumentMeta {
   entityCount: number
   createdAt: string
   updatedAt: string
+  isDraft?: boolean
 }
 
 export interface DocumentData {

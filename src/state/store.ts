@@ -197,48 +197,57 @@ function jsonReplacer(_key: string, value: unknown): unknown {
 }
 
 // Persistence configuration
-// Documents are persisted in IndexedDB; we only persist auth + editor session + corpus rules cache.
+// Documents are persisted in IndexedDB; we only persist auth + lightweight preferences here.
+// pages/spans/regions are intentionally excluded: their token arrays make them very large
+// (hundreds of Token objects per page), and for documents ≥ ~50 pages the serialised JSON
+// exceeds the ~5 MB sessionStorage quota and crashes the app with QuotaExceededError.
+// Saved documents reload from IndexedDB on navigation; unsaved in-progress documents are
+// restarted fresh on page reload (acceptable trade-off vs. an unrecoverable crash).
 type PersistedState = Pick<AppState,
   'isAuthenticated' | 'user' | 'token' |
-  'pages' | 'spans' | 'regions' | 'suppressedTexts' | 'labelOverrides' | 'forcedLabels' |
-  'currentPage' | 'confidenceThreshold' | 'totalPageCount' | 'pageProcessingStatus' | 'isDirty' |
+  'suppressedTexts' | 'labelOverrides' | 'forcedLabels' |
+  'currentPage' | 'confidenceThreshold' |
   'loadedDocumentId'
 >
 
+// Wrap sessionStorage so a QuotaExceededError never propagates as an unhandled crash.
+const safeSessionStorage = {
+  getItem: (name: string): string | null => sessionStorage.getItem(name),
+  setItem: (name: string, value: string): void => {
+    try {
+      sessionStorage.setItem(name, value)
+    } catch (e) {
+      if (e instanceof DOMException && (e.name === 'QuotaExceededError' || e.code === 22)) {
+        console.warn('[Store] sessionStorage quota exceeded — session preferences not saved. Consider clearing site data.')
+      } else {
+        throw e
+      }
+    }
+  },
+  removeItem: (name: string): void => sessionStorage.removeItem(name),
+}
+
 const persistConfig: PersistOptions<AppState, PersistedState> = {
   name: STORAGE_KEY,
-  storage: createJSONStorage(() => sessionStorage, {
+  storage: createJSONStorage(() => safeSessionStorage, {
     reviver: jsonReviver,
     replacer: jsonReplacer,
   }),
-  // Persist auth state and essential document state
+  // Persist only auth state + lightweight preferences; never large document arrays.
   partialize: (state): PersistedState => ({
     isAuthenticated: state.isAuthenticated,
     user: state.user,
     token: state.token,
-    pages: state.pages,
-    spans: state.spans,
-    regions: state.regions,
     suppressedTexts: state.suppressedTexts,
     labelOverrides: state.labelOverrides,
     forcedLabels: state.forcedLabels,
     currentPage: state.currentPage,
     confidenceThreshold: state.confidenceThreshold,
-    totalPageCount: state.totalPageCount,
-    pageProcessingStatus: state.pageProcessingStatus,
-    isDirty: state.isDirty,
     loadedDocumentId: state.loadedDocumentId,
   }),
-  // After hydration, normalize legacy labels and rebuild derived state
+  // After hydration, normalize legacy labels in corpus-rules maps
   onRehydrateStorage: () => (state) => {
     if (state) {
-      // Normalize legacy entity labels (EMAIL, PHONE, etc. → IDENTIFIER)
-      state.spans.forEach((s) => {
-        s.label = normalizeEntityLabel(s.label)
-      })
-      state.regions.forEach((r) => {
-        r.label = normalizeEntityLabel(r.label)
-      })
       state.labelOverrides = new Map(
         Array.from(state.labelOverrides.entries()).map(([k, v]) => [k, normalizeEntityLabel(v)])
       )
@@ -246,16 +255,9 @@ const persistConfig: PersistOptions<AppState, PersistedState> = {
         Array.from(state.forcedLabels.entries()).map(([k, v]) => [k, normalizeEntityLabel(v)])
       )
       console.log('[Store] Rehydrated from sessionStorage:', {
-        pages: state.pages.length,
-        spans: state.spans.length,
         currentPage: state.currentPage,
+        loadedDocumentId: state.loadedDocumentId,
       })
-      // Rebuild tagMap from spans
-      state.updateTagMap()
-      // Mark processing as ready if we have pages
-      if (state.pages.length > 0) {
-        state.setProcessing({ stage: 'ready', progress: 100, message: 'Restored from session' })
-      }
     }
   },
 }

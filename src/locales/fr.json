@@ -70,7 +70,8 @@
     "downloadError": "Echec du telechargement du document",
     "generating": "Génération...",
     "deleteError": "Echec de la suppression du document",
-    "renameError": "Echec du renommage du document"
+    "renameError": "Echec du renommage du document",
+    "draft": "Brouillon"
   },
   "sidebar": {
     "title": "Entités détectées",

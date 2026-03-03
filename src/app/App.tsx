@@ -11,8 +11,11 @@ import { getKnownFalsePositiveTexts } from '../ner/knownFalsePositives'
 import { createSpan } from '../tagging/applyEdits'
 import { useModelLoader } from '../hooks/useModelLoader'
 import { processDocumentProgressively } from '../processing/pageProcessor'
+import type { ResumeOptions } from '../processing/pageProcessor'
 import { storePdf, loadPdf as loadStoredPdf, clearPdf, arrayBufferToFile } from '../state/pdfPersistence'
 import {
+  deleteDocumentData,
+  deleteDocumentMeta,
   getDocumentData,
   loadAllDocumentMetas,
   loadCorpusRules,
@@ -69,6 +72,8 @@ export default function App() {
   const savedDocuments = useStore((state) => state.savedDocuments)
   const getSavedDocument = useStore((state) => state.getSavedDocument)
   const setSavedDocuments = useStore((state) => state.setSavedDocuments)
+  const addSavedDocument = useStore((state) => state.addSavedDocument)
+  const removeSavedDocument = useStore((state) => state.removeSavedDocument)
   const updateSavedDocument = useStore((state) => state.updateSavedDocument)
 
   // Store actions
@@ -297,13 +302,17 @@ export default function App() {
         const originalName = savedMeta?.originalFilename ?? 'document.pdf'
         const pdfFile = new File([savedData.pdfData], originalName, { type: 'application/pdf' })
 
-        // Reset state and prepare for loading
+        const isDraft = savedMeta?.isDraft ?? false
+        const parsedPages = Array.isArray(storedPages) ? storedPages : []
+        const normalizedEntities = Array.isArray(entities)
+          ? entities.map((s) => ({ ...s, label: normalizeEntityLabel(s.label) }))
+          : []
+
+        // Reset state and hydrate saved data
         reset()
         setFile(pdfFile)
         setPdfDocument(pdfDoc)
-        setTotalPageCount(numPages)
         setLoadedDocumentId(documentIdParam)
-        setDirty(false)
 
         // Store as in-progress PDF for refresh resilience
         try {
@@ -312,28 +321,106 @@ export default function App() {
           console.warn('[App] Failed to persist PDF to IndexedDB:', e)
         }
 
-        // Hydrate pages/spans without running OCR/NER (normalize legacy labels)
-        setPages(Array.isArray(storedPages) ? storedPages : [])
-        setSpans(
-          Array.isArray(entities)
-            ? entities.map((s) => ({ ...s, label: normalizeEntityLabel(s.label) }))
-            : []
-        )
+        setPages(parsedPages)
+        setSpans(normalizedEntities)
         setRegions(
           Array.isArray(storedRegions)
             ? storedRegions.map((r) => ({ ...r, label: normalizeEntityLabel(r.label) }))
             : []
         )
 
-        // Mark all pages ready in status map
-        for (let i = 0; i < numPages; i++) {
-          setPageProcessingStatus(i, 'ready')
+        const resumeFromPage = isDraft ? parsedPages.length : numPages
+
+        if (isDraft && resumeFromPage < numPages) {
+          // Draft with remaining pages: show full PDF, mark saved pages ready,
+          // queue remaining pages as pending, then resume processing in background.
+          setDirty(true)
+          setTotalPageCount(numPages)
+          for (let i = 0; i < resumeFromPage; i++) {
+            setPageProcessingStatus(i, 'ready')
+          }
+          for (let i = resumeFromPage; i < numPages; i++) {
+            setPageProcessingStatus(i, 'pending')
+          }
+
+          // Clear URL param before kicking off background work
+          setSearchParams({}, { replace: true })
+
+          const resumePdfBuffer = savedData.pdfData
+          const resumeOptions: ResumeOptions = {
+            startPage: resumeFromPage,
+            seedPages: parsedPages,
+            seedSpans: normalizedEntities,
+          }
+
+          // Fire-and-forget: resume processing remaining pages
+          processDocumentProgressively(pdfDoc, numPages, {
+            onPageStart: (pageIndex) => {
+              setPageProcessingStatus(pageIndex, 'processing')
+            },
+            onOcrProgress: () => {},
+            onPageComplete: (pageIndex, result) => {
+              addPage(result.pageModel)
+              addPageSpans(result.spans)
+              addPageRegions(result.regions)
+              setPageProcessingStatus(pageIndex, 'ready')
+
+              // Auto-save draft every 10 pages
+              if ((pageIndex + 1) % 10 === 0) {
+                const s = useStore.getState()
+                const now = new Date().toISOString()
+                const draftMeta = {
+                  id: documentIdParam,
+                  filename: savedMeta?.filename ?? originalName,
+                  originalFilename: originalName,
+                  pageCount: s.pages.length,
+                  entityCount: s.spans.length,
+                  createdAt: savedMeta?.createdAt ?? now,
+                  updatedAt: now,
+                  isDraft: true,
+                }
+                putDocumentData(documentIdParam, {
+                  pdfData: resumePdfBuffer,
+                  pagesJson: JSON.stringify(s.pages),
+                  entitiesJson: JSON.stringify(s.spans),
+                  regionsJson: JSON.stringify(s.regions),
+                })
+                  .then(() => upsertDocumentMeta(draftMeta))
+                  .then(() => addSavedDocument(draftMeta))
+                  .catch(e => console.warn('[App] Draft resume auto-save failed:', e))
+              }
+            },
+            onPageError: (pageIndex, error) => {
+              console.error(`Error resuming page ${pageIndex}:`, error)
+              setPageProcessingStatus(pageIndex, 'error')
+            },
+            onFirstPageReady: () => {
+              setProcessing({ stage: 'ready', progress: 100, message: '' })
+            },
+            onAllPagesComplete: (allSpans, allPages) => {
+              const finalPropagated = propagateEntities(allSpans, allPages)
+              if (finalPropagated.length > 0) {
+                addSpans(finalPropagated)
+              }
+            },
+          }, () => ({
+            suppressedTexts: new Set([...getKnownFalsePositiveTexts(), ...useStore.getState().suppressedTexts]),
+            labelOverrides: useStore.getState().labelOverrides,
+            forcedLabels: useStore.getState().forcedLabels,
+          }), resumeOptions).catch(e => console.error('[App] Draft resume failed:', e))
+
+        } else {
+          // Fully processed document (or fully-processed draft): show as-is
+          setDirty(false)
+          setTotalPageCount(resumeFromPage)
+          for (let i = 0; i < resumeFromPage; i++) {
+            setPageProcessingStatus(i, 'ready')
+          }
+          setProcessing({ stage: 'ready', progress: 100, message: '' })
+
+          // Clear the URL param to avoid reloading
+          setSearchParams({}, { replace: true })
         }
-
-        setProcessing({ stage: 'ready', progress: 100, message: '' })
-
-        // Clear the URL param to avoid reloading
-        setSearchParams({}, { replace: true })
 
       } catch (error) {
         console.error('[App] Failed to load document from store:', error)
@@ -350,13 +437,28 @@ export default function App() {
     }
 
     loadDocumentFromStore()
-  }, [searchParams, loadedDocumentId, loadingDocument, setProcessing, setFile, setPages, setSpans, setTotalPageCount, setPageProcessingStatus, setLoadedDocumentId, setSearchParams, navigate, reset, getSavedDocument, setDirty, t])
+  }, [searchParams, loadedDocumentId, loadingDocument, setProcessing, setFile, setPages, setSpans, setTotalPageCount, setPageProcessingStatus, setLoadedDocumentId, setSearchParams, navigate, reset, getSavedDocument, setDirty, addPage, addPageSpans, addPageRegions, addSpans, addSavedDocument, t])
 
   // Process a PDF file progressively
   const processFile = useCallback(async (selectedFile: File) => {
-    // New document: clear previous editor state
+    // Delete any abandoned draft before resetting — but only if pages are actually
+    // loaded in this session. If loadedDocumentId was merely rehydrated from
+    // sessionStorage after a refresh (pages.length === 0), we must not delete it.
+    const prevState = useStore.getState()
+    const prevDraftId = prevState.loadedDocumentId
+    if (prevDraftId && prevState.pages.length > 0) {
+      const prevMeta = prevState.getSavedDocument(prevDraftId)
+      if (prevMeta?.isDraft) {
+        deleteDocumentData(prevDraftId).catch(() => {})
+        deleteDocumentMeta(prevDraftId).catch(() => {})
+        prevState.removeSavedDocument(prevDraftId)
+      }
+    }
+
+    // New document: clear previous editor state and assign draft ID immediately
     reset()
-    setLoadedDocumentId(null)
+    const draftId = `doc_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
+    setLoadedDocumentId(draftId)
     setDirty(true)
     setFile(selectedFile)
 
@@ -379,10 +481,11 @@ export default function App() {
       setPdfDocument(document)
       setTotalPageCount(numPages)
 
-      // Store PDF in IndexedDB for persistence
+      // Store PDF in IndexedDB for persistence; keep reference for draft auto-saves
+      let pdfArrayBuffer: ArrayBuffer | null = null
       try {
-        const arrayBuffer = await selectedFile.arrayBuffer()
-        await storePdf(arrayBuffer, selectedFile.name)
+        pdfArrayBuffer = await selectedFile.arrayBuffer()
+        await storePdf(pdfArrayBuffer, selectedFile.name)
       } catch (e) {
         console.warn('[App] Failed to persist PDF to IndexedDB:', e)
       }
@@ -439,6 +542,31 @@ export default function App() {
 
           // Mark page as ready
           setPageProcessingStatus(pageIndex, 'ready')
+
+          // Auto-save draft every 10 pages (fire-and-forget)
+          if (pdfArrayBuffer && (pageIndex + 1) % 10 === 0) {
+            const s = useStore.getState()
+            const now = new Date().toISOString()
+            const draftMeta = {
+              id: draftId,
+              filename: selectedFile.name,
+              originalFilename: selectedFile.name,
+              pageCount: s.pages.length,
+              entityCount: s.spans.length,
+              createdAt: now,
+              updatedAt: now,
+              isDraft: true,
+            }
+            putDocumentData(draftId, {
+              pdfData: pdfArrayBuffer,
+              pagesJson: JSON.stringify(s.pages),
+              entitiesJson: JSON.stringify(s.spans),
+              regionsJson: JSON.stringify(s.regions),
+            })
+              .then(() => upsertDocumentMeta(draftMeta))
+              .then(() => addSavedDocument(draftMeta))
+              .catch(e => console.warn('[App] Draft auto-save failed:', e))
+          }
         },
 
         onPageError: (pageIndex, error) => {
@@ -478,7 +606,7 @@ export default function App() {
         message: error instanceof Error ? error.message : 'Processing failed',
       })
     }
-  }, [reset, setLoadedDocumentId, setDirty, setFile, setProcessing, setTotalPageCount, setPageProcessingStatus, addPage, addPageSpans, addSpans, t])
+  }, [reset, setLoadedDocumentId, setDirty, setFile, setProcessing, setTotalPageCount, setPageProcessingStatus, addPage, addPageSpans, addSpans, addSavedDocument, t])
 
   // Process file from navigation state (when coming from DocumentListPage upload modal)
   useEffect(() => {

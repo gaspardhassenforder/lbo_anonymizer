@@ -28,7 +28,8 @@ function toDocument(saved: SavedDocumentMeta): Document {
     originalFilename: saved.originalFilename,
     pageCount: saved.pageCount,
     entityCount: saved.entityCount,
-    createdAt: saved.createdAt
+    createdAt: saved.createdAt,
+    isDraft: saved.isDraft,
   }
 }
 
