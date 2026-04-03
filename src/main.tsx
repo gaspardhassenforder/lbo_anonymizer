@@ -11,6 +11,10 @@ import DropPage from './app/DropPage'
 import './i18n'
 import './index.css'
 
+// Prevent browser from navigating to a dropped file outside a drop zone.
+document.addEventListener('dragover', (e) => e.preventDefault())
+document.addEventListener('drop', (e) => e.preventDefault())
+
 const router = createBrowserRouter([
   // Public route - login page
   {
